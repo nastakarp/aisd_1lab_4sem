@@ -6,18 +6,18 @@ def calculate_entropy(data: bytes) -> float:
     """
     Вычисление энтропии данных.
     :param data: Входные данные (байтовая строка).
-    :return: Значение энтропии в битах.
+    :return: Энтропия (бит/символ).
     """
     if not data:
         return 0.0
 
-    # Подсчет частот символов
-    frequency = Counter(data)
+    # Вычисляем частоту каждого символа
+    counter = Counter(data)
     total_length = len(data)
 
-    # Вычисление энтропии
+    # Вычисляем энтропию
     entropy = 0.0
-    for count in frequency.values():
+    for count in counter.values():
         probability = count / total_length
         entropy -= probability * math.log2(probability)
 

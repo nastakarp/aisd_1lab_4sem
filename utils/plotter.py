@@ -27,11 +27,11 @@ def plot_compression_ratio_vs_buffer_size(buffer_sizes: list, compression_ratios
     """
     Построение графика зависимости коэффициента сжатия от размера буфера.
     :param buffer_sizes: Список размеров буферов.
-    :param compression_ratios: Список коэффициентов сжатия для каждого размера буфера.
+    :param compression_ratios: Список коэффициентов сжатия.
     :param output_file: Путь для сохранения графика (если None, график отображается на экране).
     """
     plt.figure(figsize=(10, 6))
-    plt.plot(buffer_sizes, compression_ratios, marker='o', linestyle='-', color='r')
+    plt.plot(buffer_sizes, compression_ratios, marker='o', linestyle='-', color='b')
     plt.title("Зависимость коэффициента сжатия от размера буфера")
     plt.xlabel("Размер буфера (байты)")
     plt.ylabel("Коэффициент сжатия")
