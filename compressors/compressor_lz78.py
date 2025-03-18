@@ -1,6 +1,6 @@
 #compressor_lz78
 from algorithms.lz78 import LZ78Encoder, LZ78Decoder
-def compress(data: bytes) -> bytes:
+def compress_lz78(data: bytes) -> bytes:
     """
     Компрессор: LZ78.
     :param data: Входные данные (байтовая строка).
@@ -16,7 +16,7 @@ def compress(data: bytes) -> bytes:
     return bytes(compressed_data)
 
 
-def decompress(compressed_data: bytes) -> bytes:
+def decompress_lz78(compressed_data: bytes) -> bytes:
     """
     Декомпрессор: LZ78.
     :param compressed_data: Сжатые данные (байтовая строка).
@@ -40,11 +40,11 @@ if __name__ == "__main__":
     input_data = b"abracadabra"
 
     # Сжатие
-    compressed = compress(input_data)
+    compressed = compress_lz78(input_data)
     print(f"Сжатые данные: {compressed}")
 
     # Декомпрессия
-    decompressed = decompress(compressed)
+    decompressed = decompress_lz78(compressed)
     print(f"Восстановленные данные: {decompressed.decode('utf-8')}")
 
     # Проверка корректности

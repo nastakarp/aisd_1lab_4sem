@@ -4,7 +4,7 @@ from algorithms.huffman import huffman_encode, huffman_decode
 
 
 
-def compress(data: bytes) -> bytes:
+def compress_lz78_ha(data: bytes) -> bytes:
     """
     Компрессор: LZ78 + HA.
     :param data: Входные данные (байтовая строка).
@@ -26,7 +26,7 @@ def compress(data: bytes) -> bytes:
     return compressed_data
 
 
-def decompress(compressed_data: bytes) -> bytes:
+def decompress_lz78_ha(compressed_data: bytes) -> bytes:
     """
     Декомпрессор: LZ78 + HA.
     :param compressed_data: Сжатые данные (байтовая строка).
@@ -55,11 +55,11 @@ if __name__ == "__main__":
     input_data = b"abracadabra"
 
     # Сжатие
-    compressed = compress(input_data)
+    compressed = compress_lz78_ha(input_data)
     print(f"Сжатые данные: {compressed}")
 
     # Декомпрессия
-    decompressed = decompress(compressed)
+    decompressed = decompress_lz78_ha(compressed)
     print(f"Восстановленные данные: {decompressed.decode('utf-8')}")
 
     # Проверка корректности

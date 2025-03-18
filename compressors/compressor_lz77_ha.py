@@ -5,7 +5,7 @@ from utils.file_utils import read_file, write_file, process_file
 from utils.entropy_calculator import calculate_entropy
 
 
-def compress(data: bytes, buffer_size: int = 1024) -> bytes:
+def compress_lz77_ha(data: bytes, buffer_size: int = 1024) -> bytes:
     """
     Компрессор: LZ77 + HA.
     :param data: Входные данные (байтовая строка).
@@ -29,7 +29,7 @@ def compress(data: bytes, buffer_size: int = 1024) -> bytes:
     return compressed_data
 
 
-def decompress(compressed_data: bytes, buffer_size: int = 1024) -> bytes:
+def decompress_lz77_ha(compressed_data: bytes, buffer_size: int = 1024) -> bytes:
     """
     Декомпрессор: LZ77 + HA.
     :param compressed_data: Сжатые данные (байтовая строка).
@@ -46,7 +46,6 @@ def decompress(compressed_data: bytes, buffer_size: int = 1024) -> bytes:
 
 
 # Пример использования
-# Пример использования
 if __name__ == "__main__":
     # Пути к файлам
     input_file = "tests/test1_enwik7.txt"  # Входной файл
@@ -58,7 +57,7 @@ if __name__ == "__main__":
         input_file,
         output_compressed,
         output_decompressed,
-        compress,
-        decompress,
+        compress_lz77_ha,
+        decompress_lz77_ha,
         buffer_size=1024
     )

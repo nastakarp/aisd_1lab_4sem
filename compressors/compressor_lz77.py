@@ -1,7 +1,7 @@
 #compressor_lz77
 from algorithms.lz77 import lz77_encode, lz77_decode
 
-def compress(data: bytes, buffer_size: int = 1024) -> bytes:
+def compress_lz77(data: bytes, buffer_size: int = 1024) -> bytes:
     """
     Компрессор: LZ77.
     :param data: Входные данные (байтовая строка).
@@ -11,7 +11,7 @@ def compress(data: bytes, buffer_size: int = 1024) -> bytes:
     return lz77_encode(data, buffer_size)
 
 
-def decompress(compressed_data: bytes, buffer_size: int = 1024) -> bytes:
+def decompress_lz77(compressed_data: bytes, buffer_size: int = 1024) -> bytes:
     """
     Декомпрессор: LZ77.
     :param compressed_data: Сжатые данные (байтовая строка).
@@ -27,11 +27,11 @@ if __name__ == "__main__":
     input_data = b"abracadabra"
 
     # Сжатие
-    compressed = compress(input_data)
+    compressed = compress_lz77(input_data)
     print(f"Сжатые данные: {compressed}")
 
     # Декомпрессия
-    decompressed = decompress(compressed)
+    decompressed = decompress_lz77(compressed)
     print(f"Восстановленные данные: {decompressed.decode('utf-8')}")
 
     # Проверка корректности
