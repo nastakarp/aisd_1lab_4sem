@@ -4,17 +4,22 @@ from algorithms.huffman import huffman_encode, huffman_decode
 from algorithms.lz77 import lz77_encode, lz77_decode
 from utils.entropy_calculator import calculate_entropy
 
-def plot_entropy_vs_block_size(block_sizes: list, entropy_values: list, output_file: str = None):
+def plot_entropy_vs_block_size(table: list, output_file: str = None):
     """
     Построение графика зависимости энтропии от размера блоков.
-    :param block_sizes: Список размеров блоков (в символах).
-    :param entropy_values: Список значений энтропии для каждого размера блока (в битах на символ).
+    :param table: Таблица с данными.
     :param output_file: Путь для сохранения графика (если None, график отображается на экране).
     """
+    # Фильтруем данные для BWT + MTF
+    bwt_mtf_data = [row for row in table if row["Название компрессора"] == "BWT + MTF + HA"]
+    block_sizes = [row["Размер блока (байты)"] for row in bwt_mtf_data]
+    entropies = [calculate_entropy(row["Тестовые данные"].encode("utf-8")) for row in bwt_mtf_data]
+
+    # Построение графика
     plt.figure(figsize=(10, 6))
-    plt.plot(block_sizes, entropy_values, marker='o', linestyle='-', color='b')
-    plt.title("Зависимость энтропии от размера блоков")
-    plt.xlabel("Размер блока (символы)")
+    plt.plot(block_sizes, entropies, marker='o', linestyle='-', color='r')
+    plt.title("Зависимость энтропии от размера блоков (BWT + MTF)")
+    plt.xlabel("Размер блока (байты)")
     plt.ylabel("Энтропия (бит/символ)")
     plt.grid(True)
 
@@ -23,16 +28,21 @@ def plot_entropy_vs_block_size(block_sizes: list, entropy_values: list, output_f
     else:
         plt.show()
 
-def plot_compression_ratio_vs_buffer_size(buffer_sizes: list, compression_ratios: list, output_file: str = None):
+def plot_compression_ratio_vs_buffer_size(table: list, output_file: str = None):
     """
     Построение графика зависимости коэффициента сжатия от размера буфера.
-    :param buffer_sizes: Список размеров буферов.
-    :param compression_ratios: Список коэффициентов сжатия.
+    :param table: Таблица с данными.
     :param output_file: Путь для сохранения графика (если None, график отображается на экране).
     """
+    # Фильтруем данные для LZ77
+    lz77_data = [row for row in table if row["Название компрессора"] == "LZ77"]
+    buffer_sizes = [row["Размер буфера (байты)"] for row in lz77_data]
+    compression_ratios = [row["Коэффициент сжатия"] for row in lz77_data]
+
+    # Построение графика
     plt.figure(figsize=(10, 6))
     plt.plot(buffer_sizes, compression_ratios, marker='o', linestyle='-', color='b')
-    plt.title("Зависимость коэффициента сжатия от размера буфера")
+    plt.title("Зависимость коэффициента сжатия от размера буфера (LZ77)")
     plt.xlabel("Размер буфера (байты)")
     plt.ylabel("Коэффициент сжатия")
     plt.grid(True)
@@ -41,7 +51,6 @@ def plot_compression_ratio_vs_buffer_size(buffer_sizes: list, compression_ratios
         plt.savefig(output_file)
     else:
         plt.show()
-
 def plot_compression_ratios(compressors: list, compression_ratios: list, output_file: str = None):
     """
     Построение графика сравнения коэффициентов сжатия для разных компрессоров.
@@ -121,7 +130,37 @@ def analyze_compression(input_data: bytes, output_file: str = None, buffer_size:
     else:
         plt.show()
 
+def plot_compression_ratios_comparison(table: list, output_file: str = None):
+    """
+    Построение графика сравнения коэффициентов сжатия для всех компрессоров.
+    :param table: Таблица с данными.
+    :param output_file: Путь для сохранения графика (если None, график отображается на экране).
+    """
+    # Подготовка данных для графика
+    compressors = []
+    compression_ratios = []
 
+    for row in table:
+        compressor_name = row["Название компрессора"]
+        if row.get("Размер буфера (байты)"):  # Если есть размер буфера, добавляем его к названию
+            compressor_name += f" (буфер {row['Размер буфера (байты)']})"
+        compressors.append(compressor_name)
+        compression_ratios.append(row["Коэффициент сжатия"])
+
+    # Построение графика
+    plt.figure(figsize=(12, 6))
+    plt.plot(compressors, compression_ratios, marker='o', linestyle='-', color='b')
+    plt.title("Сравнение коэффициентов сжатия для всех компрессоров")
+    plt.xlabel("Компрессор")
+    plt.ylabel("Коэффициент сжатия")
+    plt.xticks(rotation=45, ha='right')  # Поворот подписей на оси X для удобства
+    plt.grid(True)
+
+    if output_file:
+        plt.savefig(output_file, bbox_inches='tight')  # Сохраняем график с учетом поворота подписей
+    else:
+        plt.tight_layout()  # Автоматическая настройка layout для предотвращения обрезания подписей
+        plt.show()
 # Пример использования
 if __name__ == "__main__":
     # Входные данные

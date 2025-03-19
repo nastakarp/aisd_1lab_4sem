@@ -6,7 +6,46 @@ from algorithms.rle import rle_encode, rle_decode
 from algorithms.lz77 import lz77_encode, lz77_decode
 from algorithms.lz78 import LZ78Encoder, LZ78Decoder
 from utils.entropy_calculator import calculate_entropy
-from utils.plotter import plot_compression_ratios, plot_entropy_vs_block_size, plot_compression_ratio_vs_buffer_size
+from utils.plotter import plot_compression_ratios, plot_entropy_vs_block_size, plot_compression_ratio_vs_buffer_size, plot_compression_ratios_comparison
+from tabulate import tabulate
+# Таблица для хранения данных о компрессии
+compression_data = []
+
+
+def add_compression_data(table: list, compressor_name: str, test_data: str, original_size: int, compressed_size: int, decompressed_size: int, buffer_size: int = None, block_size: int = None):
+    """
+    Добавление данных о компрессии в таблицу.
+    :param table: Таблица с данными.
+    :param compressor_name: Название компрессора.
+    :param test_data: Тестовые данные.
+    :param original_size: Размер до компрессии (байты).
+    :param compressed_size: Размер после компрессии (байты).
+    :param decompressed_size: Размер после декомпрессии (байты).
+    :param buffer_size: Размер буфера (для LZ77).
+    :param block_size: Размер блока (для BWT + MTF).
+    """
+    compression_ratio = compressed_size / original_size
+    table.append({
+        "Название компрессора": compressor_name,
+        "Тестовые данные": test_data,
+        "Размер до компрессии (байты)": original_size,
+        "Размер после компрессии (байты)": compressed_size,
+        "Размер после декомпрессии (байты)": decompressed_size,
+        "Коэффициент сжатия": compression_ratio,
+        "Размер буфера (байты)": buffer_size,
+        "Размер блока (байты)": block_size
+    })
+
+def plot_compression_ratios_from_table(table: list, output_file: str = None):
+    """
+    Построение графика сравнения коэффициентов сжатия для разных компрессоров на основе таблицы.
+    :param table: Таблица с данными.
+    :param output_file: Путь для сохранения графика (если None, график отображается на экране).
+    """
+    compressors = [row["Название компрессора"] for row in table]
+    compression_ratios = [row["Коэффициент сжатия"] for row in table]
+
+    plot_compression_ratios(compressors, compression_ratios, output_file=output_file)
 
 
 def compress_bwt_mtf_ha(data: bytes) -> bytes:
@@ -147,6 +186,7 @@ def compress_lz78(data: bytes) -> bytes:
         compressed_data.extend([code >> 8, code & 0xFF, byte])
     return bytes(compressed_data)
 
+
 def decompress_lz78(compressed_data: bytes) -> bytes:
     """
     Декомпрессор: LZ78.
@@ -254,6 +294,8 @@ def analyze_compression_ratio_vs_buffer_size(data: bytes, buffer_sizes: list, ou
 
     # Построение графика
     plot_compression_ratio_vs_buffer_size(buffer_sizes, compression_ratios, output_file=output_file)
+
+
 def compare_compressors(data: bytes, buffer_size: int = 1024, output_file: str = None):
     """
     Сравнение эффективности всех компрессоров.
@@ -272,38 +314,94 @@ def compare_compressors(data: bytes, buffer_size: int = 1024, output_file: str =
         ("LZ78 + HA", lambda d: compress_ha(compress_lz78(d)), lambda d: decompress_lz78(decompress_ha(d))),
     ]
 
-    compression_ratios = []
     for name, compress, decompress in compressors:
         compressed_data = compress(data)
         decompressed_data = decompress(compressed_data)
         assert data == decompressed_data, f"Декомпрессия не удалась для {name}!"
-        compression_ratio = len(compressed_data) / len(data)
-        compression_ratios.append(compression_ratio)
-        print(f"{name}: Коэффициент сжатия = {compression_ratio:.4f}")
 
-    # Построение графика
-    plot_compression_ratios([name for name, _, _ in compressors], compression_ratios, output_file=output_file)
+        # Добавляем данные в таблицу
+        add_compression_data(
+            compression_data,
+            compressor_name=name,
+            test_data="enwik7",  # Пример тестовых данных
+            original_size=len(data),
+            compressed_size=len(compressed_data),
+            decompressed_size=len(decompressed_data)
+        )
 
+    # Построение графика на основе таблицы
+    plot_compression_ratios_from_table(compression_data, output_file=output_file)
 
+def save_table_to_file(table: list, filename: str = "compression_results.txt"):
+    """
+    Сохранение таблицы с данными о компрессии в текстовый файл.
+    :param table: Таблица с данными.
+    :param filename: Имя файла для сохранения.
+    """
+    # Форматируем таблицу
+    formatted_table = tabulate(
+        table,
+        headers="keys",  # Используем ключи словаря как заголовки
+        tablefmt="grid",  # Формат таблицы (grid, plain, simple, etc.)
+        floatfmt=".4f"   # Формат чисел с плавающей точкой
+    )
+
+    # Записываем таблицу в файл
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write(formatted_table)
+
+    print(f"Таблица сохранена в файл: {filename}")
+
+# Пример использования
 # Пример использования
 if __name__ == "__main__":
     # Входные данные
     input_data = b"banana" * 1000
+    test_data_name = "banana_x1000"  # Название тестовых данных
 
-    # Размер буфера для LZ77
-    buffer_size = 1024  # Можно изменить на другое значение
-
-    # Анализ сжатия для BWT + MTF + HA
-    analyze_compression(input_data, output_file="C:/OPP/compression_project/results/graphs/bwt_mtf_ha_compression_ratio.png")
-
-    # Исследование зависимости энтропии от размера блоков
-    block_sizes = [64, 128, 256, 512, 1024]
-    analyze_entropy_vs_block_size(input_data, block_sizes, output_file="C:/OPP/compression_project/results/graphs/entropy_vs_block_size.png")
-
-    # Исследование зависимости коэффициента сжатия от размера буфера для LZ77
+    # Размеры буферов для LZ77
     buffer_sizes = [64, 128, 256, 512, 1024]
-    analyze_compression_ratio_vs_buffer_size(input_data, buffer_sizes, output_file="C:/OPP/compression_project/results/graphs/compression_ratio_vs_buffer_size.png")
 
+    # Сравнение коэффициентов сжатия для всех компрессоров
+    compressors = [
+        ("HA", compress_ha, decompress_ha),
+        ("RLE", compress_rle, decompress_rle),
+        ("BWT + RLE", compress_bwt_rle, decompress_bwt_rle),
+        ("BWT + MTF + HA", compress_bwt_mtf_ha, decompress_bwt_mtf_ha),
+        ("LZ78", compress_lz78, decompress_lz78),
+    ]
 
-    # Сравнение эффективности всех компрессоров
-    compare_compressors(input_data, buffer_size=buffer_size, output_file="C:/OPP/compression_project/results/graphs/compressor_comparison.png")
+    # Добавляем данные для компрессоров без буфера
+    for name, compress, decompress in compressors:
+        compressed_data = compress(input_data)
+        decompressed_data = decompress(compressed_data)
+        add_compression_data(
+            compression_data,
+            compressor_name=name,
+            test_data=test_data_name,
+            original_size=len(input_data),
+            compressed_size=len(compressed_data),
+            decompressed_size=len(decompressed_data)
+        )
+
+    # Добавляем данные для LZ77 с разными размерами буфера
+    for buffer_size in buffer_sizes:
+        compressed_data = compress_lz77(input_data, buffer_size)
+        decompressed_data = decompress_lz77(compressed_data)
+        add_compression_data(
+            compression_data,
+            compressor_name="LZ77",
+            test_data=test_data_name,
+            original_size=len(input_data),
+            compressed_size=len(compressed_data),
+            decompressed_size=len(decompressed_data),
+            buffer_size=buffer_size
+        )
+
+    # Сохранение таблицы в файл
+    save_table_to_file(compression_data, filename="C:/OPP/compression_project/results/compression_results.txt")
+
+    # Построение графиков
+    plot_compression_ratios_comparison(compression_data, output_file="C:/OPP/compression_project/results/compression_ratios_comparison.png")
+    plot_compression_ratio_vs_buffer_size(compression_data, output_file="C:/OPP/compression_project/results/compression_ratio_vs_buffer_size.png")
+    plot_entropy_vs_block_size(compression_data, output_file="C:/OPP/compression_project/results/entropy_vs_block_size.png")
