@@ -126,42 +126,58 @@ def calculate_compression_ratio(original_size: int, compressed_size: int) -> flo
 # Преобразование изображения в RAW
 def convert_image_to_raw(input_image_path: str, output_raw_path: str):
     """
-    Преобразует изображение в формат RAW.
+    Преобразует изображение в формат RAW и сохраняет его размеры.
     :param input_image_path: Путь к исходному изображению.
     :param output_raw_path: Путь для сохранения RAW-файла.
     """
     # Открываем изображение
     image = Image.open(input_image_path)
+    width, height = image.size
 
     # Преобразуем изображение в массив NumPy
     image_data = np.array(image)
 
     # Сохраняем данные в RAW-файл
     with open(output_raw_path, "wb") as f:
+        # Сохраняем размеры изображения (4 байта на ширину и 4 байта на высоту)
+        f.write(width.to_bytes(4, "big"))
+        f.write(height.to_bytes(4, "big"))
         f.write(image_data.tobytes())
 
     print(f"Изображение {input_image_path} преобразовано в RAW: {output_raw_path}")
 
 
 # Сжатие RAW-файла
-def compress_raw_file(input_raw_path: str, output_compressed_path: str):
+def convert_raw_to_image(input_raw_path: str, output_image_path: str, image_mode: str):
     """
-    Сжимает RAW-файл с использованием алгоритма Хаффмана.
+    Преобразует RAW-файл обратно в изображение.
     :param input_raw_path: Путь к RAW-файлу.
-    :param output_compressed_path: Путь для сохранения сжатого файла.
+    :param output_image_path: Путь для сохранения изображения.
+    :param image_mode: Режим изображения ("1", "L", "RGB").
     """
     # Чтение RAW-файла
     with open(input_raw_path, "rb") as f:
+        # Читаем размеры изображения (первые 8 байт)
+        width = int.from_bytes(f.read(4), "big")
+        height = int.from_bytes(f.read(4), "big")
         raw_data = f.read()
 
-    # Сжатие данных
-    compressed_data = huffman_compress(raw_data)
+    # Преобразование данных в массив NumPy
+    image_data = np.frombuffer(raw_data, dtype=np.uint8)
 
-    # Сохранение сжатых данных
-    with open(output_compressed_path, "wb") as f:
-        f.write(compressed_data)
+    # Преобразование массива в изображение
+    if image_mode == "RGB":
+        image_data = image_data.reshape((height, width, 3))
+    elif image_mode == "1":
+        # Для режима "1" каждый байт содержит 8 пикселей
+        image_data = np.unpackbits(image_data).reshape((height, width))
+    else:
+        image_data = image_data.reshape((height, width))
 
-    print(f"RAW-файл {input_raw_path} сжат и сохранен в {output_compressed_path}")
+    image = Image.fromarray(image_data, mode=image_mode)
+    image.save(output_image_path)
+
+    print(f"RAW-файл {input_raw_path} преобразован в изображение: {output_image_path}")
 
 
 # Декомпрессия RAW-файла
@@ -195,37 +211,28 @@ def convert_raw_to_image(input_raw_path: str, output_image_path: str, image_mode
     """
     # Чтение RAW-файла
     with open(input_raw_path, "rb") as f:
+        # Читаем размеры изображения (первые 8 байт)
+        width = int.from_bytes(f.read(4), "big")
+        height = int.from_bytes(f.read(4), "big")
         raw_data = f.read()
 
     # Преобразование данных в массив NumPy
     image_data = np.frombuffer(raw_data, dtype=np.uint8)
 
-    # Расчет размеров изображения
-    raw_data_size = len(raw_data)
-    if image_mode == "1":
-        # Черно-белое изображение (1 бит на пиксель)
-        total_pixels = raw_data_size * 8  # 1 байт = 8 пикселей
-    elif image_mode == "L":
-        # Серое изображение (1 байт на пиксель)
-        total_pixels = raw_data_size
-    elif image_mode == "RGB":
-        # Цветное изображение (3 байта на пиксель)
-        total_pixels = raw_data_size // 3
-    else:
-        raise ValueError("Неподдерживаемый режим изображения")
-
-    # Предполагаем, что изображение квадратное
-    side = int(math.sqrt(total_pixels))
-    image_size = (side, side)
-
     # Преобразование массива в изображение
     if image_mode == "RGB":
-        image_data = image_data.reshape((image_size[1], image_size[0], 3))
+        image_data = image_data.reshape((height, width, 3))
     elif image_mode == "1":
         # Для режима "1" каждый байт содержит 8 пикселей
-        image_data = np.unpackbits(image_data).reshape((image_size[1], image_size[0]))
+        # Распаковываем биты и изменяем форму массива
+        image_data = np.unpackbits(image_data)
+        # Убедимся, что количество пикселей соответствует width * height
+        expected_pixels = width * height
+        if len(image_data) > expected_pixels:
+            image_data = image_data[:expected_pixels]  # Обрезаем лишние данные
+        image_data = image_data.reshape((height, width))
     else:
-        image_data = image_data.reshape((image_size[1], image_size[0]))
+        image_data = image_data.reshape((height, width))
 
     image = Image.fromarray(image_data, mode=image_mode)
     image.save(output_image_path)
@@ -285,6 +292,25 @@ def calculate_image_size(raw_data_size: int, image_mode: str) -> tuple:
     side = int(math.sqrt(total_pixels))
     return (side, side)
 
+# Определение функции compress_raw_file
+def compress_raw_file(input_raw_path: str, output_compressed_path: str):
+    """
+    Сжимает RAW-файл с использованием алгоритма Хаффмана.
+    :param input_raw_path: Путь к RAW-файлу.
+    :param output_compressed_path: Путь для сохранения сжатого файла.
+    """
+    # Чтение RAW-файла
+    with open(input_raw_path, "rb") as f:
+        raw_data = f.read()
+
+    # Сжатие данных
+    compressed_data = huffman_compress(raw_data)
+
+    # Сохранение сжатых данных
+    with open(output_compressed_path, "wb") as f:
+        f.write(compressed_data)
+
+    print(f"RAW-файл {input_raw_path} сжат и сохранен в {output_compressed_path}")
 
 # Основная функция
 if __name__ == "__main__":
