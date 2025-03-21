@@ -21,7 +21,6 @@ def calculate_entropy(data: bytes) -> float:
         probability = count / total_length
         entropy -= probability * math.log2(probability)
 
-    return entropy
 
 
 def calculate_entropy_from_file(file_path: str) -> float:

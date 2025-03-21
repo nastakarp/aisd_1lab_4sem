@@ -6,7 +6,6 @@ from algorithms.huffman import huffman_encode, huffman_decode
 from utils.entropy_calculator import calculate_entropy
 from utils.plotter import plot_compression_ratios
 
-
 def compress_bwt_mtf_ha(data: bytes) -> bytes:
     """
     Компрессор: BWT + MTF + HA.
@@ -32,7 +31,6 @@ def compress_bwt_mtf_ha(data: bytes) -> bytes:
     print(f"Энтропия сжатых данных: {compressed_entropy:.4f} бит")
 
     return compressed_data
-
 
 def decompress_bwt_mtf_ha(compressed_data: bytes) -> bytes:
     """
