@@ -123,120 +123,141 @@ def calculate_compression_ratio(original_size: int, compressed_size: int) -> flo
     return original_size / compressed_size if compressed_size != 0 else 0
 
 
-# Анализ файла (размер и энтропия)
-def analyze_file(file_path: str):
-    with open(file_path, "rb") as f:
-        data = f.read()
-    file_size = len(data)
-    entropy = calculate_entropy(data)
-    return file_size, entropy
-
-
-# Сжатие изображения
-def compress_image(input_image_path: str, output_compressed_path: str):
-    # Проверяем, существует ли директория для выходного файла
-    output_dir = os.path.dirname(output_compressed_path)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
+# Преобразование изображения в RAW
+def convert_image_to_raw(input_image_path: str, output_raw_path: str):
+    """
+    Преобразует изображение в формат RAW.
+    :param input_image_path: Путь к исходному изображению.
+    :param output_raw_path: Путь для сохранения RAW-файла.
+    """
     # Открываем изображение
     image = Image.open(input_image_path)
+
+    # Преобразуем изображение в массив NumPy
     image_data = np.array(image)
 
-    # Получаем размеры изображения
-    height, width = image_data.shape[:2]
+    # Сохраняем данные в RAW-файл
+    with open(output_raw_path, "wb") as f:
+        f.write(image_data.tobytes())
 
-    # Преобразуем данные изображения в байты
-    if image.mode == "1":  # Черно-белое изображение
-        data = image_data.tobytes()
-    elif image.mode == "L":  # Серое изображение
-        data = image_data.tobytes()
-    elif image.mode == "RGB":  # Цветное изображение
-        # Разделяем на каналы R, G, B
-        r, g, b = image_data[:, :, 0], image_data[:, :, 1], image_data[:, :, 2]
-        data = {
-            "r": r.tobytes(),
-            "g": g.tobytes(),
-            "b": b.tobytes(),
-        }
-    else:
-        raise ValueError("Неподдерживаемый формат изображения")
+    print(f"Изображение {input_image_path} преобразовано в RAW: {output_raw_path}")
 
-    # Сжимаем данные
-    if isinstance(data, dict):  # Цветное изображение
-        compressed_data = {
-            "r": huffman_compress(data["r"]),
-            "g": huffman_compress(data["g"]),
-            "b": huffman_compress(data["b"]),
-            "height": height,
-            "width": width,
-        }
-    else:  # Черно-белое или серое изображение
-        compressed_data = {
-            "data": huffman_compress(data),
-            "height": height,
-            "width": width,
-        }
 
-    # Сохраняем сжатые данные
+# Сжатие RAW-файла
+def compress_raw_file(input_raw_path: str, output_compressed_path: str):
+    """
+    Сжимает RAW-файл с использованием алгоритма Хаффмана.
+    :param input_raw_path: Путь к RAW-файлу.
+    :param output_compressed_path: Путь для сохранения сжатого файла.
+    """
+    # Чтение RAW-файла
+    with open(input_raw_path, "rb") as f:
+        raw_data = f.read()
+
+    # Сжатие данных
+    compressed_data = huffman_compress(raw_data)
+
+    # Сохранение сжатых данных
     with open(output_compressed_path, "wb") as f:
-        pickle.dump(compressed_data, f)
+        f.write(compressed_data)
+
+    print(f"RAW-файл {input_raw_path} сжат и сохранен в {output_compressed_path}")
 
 
-# Декомпрессия изображения
-def decompress_image(input_compressed_path: str, output_image_path: str):
-    # Проверяем, существует ли директория для выходного файла
-    output_dir = os.path.dirname(output_image_path)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # Загружаем сжатые данные
+# Декомпрессия RAW-файла
+def decompress_raw_file(input_compressed_path: str, output_raw_path: str):
+    """
+    Декомпрессия RAW-файла.
+    :param input_compressed_path: Путь к сжатому файлу.
+    :param output_raw_path: Путь для сохранения восстановленного RAW-файла.
+    """
+    # Чтение сжатого файла
     with open(input_compressed_path, "rb") as f:
-        compressed_data = pickle.load(f)
+        compressed_data = f.read()
 
-    # Извлекаем высоту и ширину
-    height = compressed_data["height"]
-    width = compressed_data["width"]
+    # Декомпрессия данных
+    decompressed_data = huffman_decompress(compressed_data)
 
-    # Распаковываем данные
-    if "r" in compressed_data:  # Цветное изображение
-        r = huffman_decompress(compressed_data["r"])
-        g = huffman_decompress(compressed_data["g"])
-        b = huffman_decompress(compressed_data["b"])
-        # Преобразуем байты обратно в массив numpy
-        r = np.frombuffer(r, dtype=np.uint8).reshape((height, width))
-        g = np.frombuffer(g, dtype=np.uint8).reshape((height, width))
-        b = np.frombuffer(b, dtype=np.uint8).reshape((height, width))
-        # Объединяем каналы
-        image_data = np.stack((r, g, b), axis=-1)
-    else:  # Черно-белое или серое изображение
-        data = huffman_decompress(compressed_data["data"])
-        image_data = np.frombuffer(data, dtype=np.uint8).reshape((height, width))
+    # Сохранение восстановленного RAW-файла
+    with open(output_raw_path, "wb") as f:
+        f.write(decompressed_data)
 
-    # Создаем изображение из данных
-    image = Image.fromarray(image_data)
+    print(f"Сжатый файл {input_compressed_path} декомпрессирован в {output_raw_path}")
 
-    # Сохраняем изображение
+
+# Преобразование RAW обратно в изображение
+def convert_raw_to_image(input_raw_path: str, output_image_path: str, image_mode: str):
+    """
+    Преобразует RAW-файл обратно в изображение.
+    :param input_raw_path: Путь к RAW-файлу.
+    :param output_image_path: Путь для сохранения изображения.
+    :param image_mode: Режим изображения ("1", "L", "RGB").
+    """
+    # Чтение RAW-файла
+    with open(input_raw_path, "rb") as f:
+        raw_data = f.read()
+
+    # Преобразование данных в массив NumPy
+    image_data = np.frombuffer(raw_data, dtype=np.uint8)
+
+    # Расчет размеров изображения
+    raw_data_size = len(raw_data)
+    if image_mode == "1":
+        # Черно-белое изображение (1 бит на пиксель)
+        total_pixels = raw_data_size * 8  # 1 байт = 8 пикселей
+    elif image_mode == "L":
+        # Серое изображение (1 байт на пиксель)
+        total_pixels = raw_data_size
+    elif image_mode == "RGB":
+        # Цветное изображение (3 байта на пиксель)
+        total_pixels = raw_data_size // 3
+    else:
+        raise ValueError("Неподдерживаемый режим изображения")
+
+    # Предполагаем, что изображение квадратное
+    side = int(math.sqrt(total_pixels))
+    image_size = (side, side)
+
+    # Преобразование массива в изображение
+    if image_mode == "RGB":
+        image_data = image_data.reshape((image_size[1], image_size[0], 3))
+    elif image_mode == "1":
+        # Для режима "1" каждый байт содержит 8 пикселей
+        image_data = np.unpackbits(image_data).reshape((image_size[1], image_size[0]))
+    else:
+        image_data = image_data.reshape((image_size[1], image_size[0]))
+
+    image = Image.fromarray(image_data, mode=image_mode)
     image.save(output_image_path)
 
+    print(f"RAW-файл {input_raw_path} преобразован в изображение: {output_image_path}")
 
-# Пример использования
-if __name__ == "__main__":
-    # Обработка черно-белого изображения
-    bw_input = "C:/OPP/compression_project/tests/black_white_image.png"
-    bw_compressed = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
-    bw_decompressed = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.png"
 
-    # Сжатие и декомпрессия
-    compress_image(bw_input, bw_compressed)
-    decompress_image(bw_compressed, bw_decompressed)
+# Анализ сжатия
+def analyze_compression(input_raw_path: str, compressed_path: str):
+    """
+    Анализирует сжатие: рассчитывает коэффициент сжатия и энтропию.
+    :param input_raw_path: Путь к исходному RAW-файлу.
+    :param compressed_path: Путь к сжатому файлу.
+    """
+    # Чтение исходного RAW-файла
+    with open(input_raw_path, "rb") as f:
+        raw_data = f.read()
 
-    # Анализ сжатия
-    original_size, original_entropy = analyze_file(bw_input)
-    compressed_size, compressed_entropy = analyze_file(bw_compressed)
+    # Чтение сжатого файла
+    with open(compressed_path, "rb") as f:
+        compressed_data = f.read()
+
+    # Расчет коэффициента сжатия
+    original_size = len(raw_data)
+    compressed_size = len(compressed_data)
     compression_ratio = calculate_compression_ratio(original_size, compressed_size)
 
-    print("Черно-белое изображение:")
+    # Расчет энтропии
+    original_entropy = calculate_entropy(raw_data)
+    compressed_entropy = calculate_entropy(compressed_data)
+
+    # Вывод результатов
     print(f"Размер исходного файла: {original_size} байт")
     print(f"Размер сжатого файла: {compressed_size} байт")
     print(f"Коэффициент сжатия: {compression_ratio:.2f}")
@@ -244,46 +265,75 @@ if __name__ == "__main__":
     print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
     print("-" * 40)
 
-    # Обработка серого изображения
-    gray_input = "C:/OPP/compression_project/tests/gray_image.png"
-    gray_compressed = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
-    gray_decompressed = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.png"
+def calculate_image_size(raw_data_size: int, image_mode: str) -> tuple:
+    """
+    Рассчитывает размеры изображения на основе размера RAW-файла и режима изображения.
+    :param raw_data_size: Размер RAW-файла в байтах.
+    :param image_mode: Режим изображения ("1", "L", "RGB").
+    :return: Кортеж (ширина, высота).
+    """
+    if image_mode == "1":  # Черно-белое изображение (1 бит на пиксель)
+        total_pixels = raw_data_size * 8  # 1 байт = 8 пикселей
+    elif image_mode == "L":  # Серое изображение (1 байт на пиксель)
+        total_pixels = raw_data_size
+    elif image_mode == "RGB":  # Цветное изображение (3 байта на пиксель)
+        total_pixels = raw_data_size // 3
+    else:
+        raise ValueError("Неподдерживаемый режим изображения")
 
-    # Сжатие и декомпрессия
-    compress_image(gray_input, gray_compressed)
-    decompress_image(gray_compressed, gray_decompressed)
+    # Предполагаем, что изображение квадратное
+    side = int(math.sqrt(total_pixels))
+    return (side, side)
+
+
+# Основная функция
+if __name__ == "__main__":
+    # Пути к изображениям
+    bw_image_path = "C:/OPP/compression_project/tests/black_white_image.png"
+    gray_image_path = "C:/OPP/compression_project/tests/gray_image.png"
+    color_image_path = "C:/OPP/compression_project/tests/color_image.png"
+
+    # Пути для сохранения RAW-файлов
+    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
+    gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
+    color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
+
+    # Преобразование изображений в RAW
+    convert_image_to_raw(bw_image_path, bw_raw_path)
+    convert_image_to_raw(gray_image_path, gray_raw_path)
+    convert_image_to_raw(color_image_path, color_raw_path)
+
+    # Пути для сохранения сжатых файлов
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
+
+    # Сжатие RAW-файлов
+    compress_raw_file(bw_raw_path, bw_compressed_path)
+    compress_raw_file(gray_raw_path, gray_compressed_path)
+    compress_raw_file(color_raw_path, color_compressed_path)
 
     # Анализ сжатия
-    original_size, original_entropy = analyze_file(gray_input)
-    compressed_size, compressed_entropy = analyze_file(gray_compressed)
-    compression_ratio = calculate_compression_ratio(original_size, compressed_size)
+    print("Черно-белое изображение:")
+    analyze_compression(bw_raw_path, bw_compressed_path)
 
     print("Серое изображение:")
-    print(f"Размер исходного файла: {original_size} байт")
-    print(f"Размер сжатого файла: {compressed_size} байт")
-    print(f"Коэффициент сжатия: {compression_ratio:.2f}")
-    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
-    print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
-    print("-" * 40)
-
-    # Обработка цветного изображения
-    color_input = "C:/OPP/compression_project/tests/color_image.png"
-    color_compressed = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
-    color_decompressed = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.png"
-
-    # Сжатие и декомпрессия
-    compress_image(color_input, color_compressed)
-    decompress_image(color_compressed, color_decompressed)
-
-    # Анализ сжатия
-    original_size, original_entropy = analyze_file(color_input)
-    compressed_size, compressed_entropy = analyze_file(color_compressed)
-    compression_ratio = calculate_compression_ratio(original_size, compressed_size)
+    analyze_compression(gray_raw_path, gray_compressed_path)
 
     print("Цветное изображение:")
-    print(f"Размер исходного файла: {original_size} байт")
-    print(f"Размер сжатого файла: {compressed_size} байт")
-    print(f"Коэффициент сжатия: {compression_ratio:.2f}")
-    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
-    print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
-    print("-" * 40)
+    analyze_compression(color_raw_path, color_compressed_path)
+
+    # Пути для восстановленных RAW-файлов
+    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
+    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
+    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw"
+
+    # Декомпрессия RAW-файлов
+    decompress_raw_file(bw_compressed_path, bw_decompressed_raw_path)
+    decompress_raw_file(gray_compressed_path, gray_decompressed_raw_path)
+    decompress_raw_file(color_compressed_path, color_decompressed_raw_path)
+
+    # Преобразование RAW обратно в изображения
+    convert_raw_to_image(bw_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.png", "1")
+    convert_raw_to_image(gray_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.png", "L")
+    convert_raw_to_image(color_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.png", "RGB")
