@@ -1,6 +1,11 @@
+import heapq
+from collections import defaultdict, Counter
+import pickle
+from PIL import Image
+import numpy as np
 import os
 import math
-from collections import Counter
+
 
 def calculate_compression_ratio(original_size: int, compressed_size: int) -> float:
     """
@@ -10,6 +15,7 @@ def calculate_compression_ratio(original_size: int, compressed_size: int) -> flo
     :return: Коэффициент сжатия.
     """
     return original_size / compressed_size
+
 
 def calculate_entropy(data: bytes) -> float:
     """
@@ -32,6 +38,7 @@ def calculate_entropy(data: bytes) -> float:
 
     return entropy
 
+
 def analyze_file(file_path: str):
     """
     Анализирует файл: рассчитывает его размер и энтропию.
@@ -43,6 +50,7 @@ def analyze_file(file_path: str):
     file_size = len(data)
     entropy = calculate_entropy(data)
     return file_size, entropy
+
 
 def analyze_compression(input_file: str, compressed_file: str):
     """
@@ -63,9 +71,14 @@ def analyze_compression(input_file: str, compressed_file: str):
     print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
     print("-" * 40)
 
-import os
-from collections import deque
+
 def lz77_encode(data: bytes, buffer_size: int = 512) -> bytes:
+    """
+    Сжимает данные с использованием алгоритма LZ77.
+    :param data: Данные для сжатия.
+    :param buffer_size: Размер буфера для поиска совпадений.
+    :return: Сжатые данные.
+    """
     compressed_data = []
     i = 0
     while i < len(data):
@@ -103,6 +116,7 @@ def lz77_encode(data: bytes, buffer_size: int = 512) -> bytes:
         i += match_length + 1
 
     return bytes(compressed_data)
+
 
 def lz77_decode(compressed_data: bytes) -> bytes:
     """
@@ -144,6 +158,7 @@ def lz77_decode(compressed_data: bytes) -> bytes:
 
     return bytes(decompressed_data)
 
+
 def compress_file(input_file: str, output_file: str, buffer_size: int = 512):
     """
     Сжимает файл с использованием алгоритма LZ77.
@@ -160,6 +175,7 @@ def compress_file(input_file: str, output_file: str, buffer_size: int = 512):
         data = f_in.read()  # Читаем весь файл
         compressed_data = lz77_encode(data, buffer_size)  # Сжимаем целиком
         f_out.write(compressed_data)
+
 
 def decompress_file(input_file: str, output_file: str):
     """
@@ -178,59 +194,92 @@ def decompress_file(input_file: str, output_file: str):
         f_out.write(decompressed_data)  # Записываем восстановленные данные
 
 
+def convert_raw_to_image(input_raw_path: str, output_image_path: str, image_mode: str):
+    """
+    Преобразует RAW-файл обратно в изображение.
+    :param input_raw_path: Путь к RAW-файлу.
+    :param output_image_path: Путь для сохранения изображения.
+    :param image_mode: Режим изображения ("1", "L", "RGB").
+    """
+    # Чтение RAW-файла
+    with open(input_raw_path, "rb") as f:
+        # Читаем размеры изображения (первые 8 байт)
+        width = int.from_bytes(f.read(4), "big")
+        height = int.from_bytes(f.read(4), "big")
+        raw_data = f.read()
+
+    # Преобразование данных в массив NumPy
+    image_data = np.frombuffer(raw_data, dtype=np.uint8)
+
+    # Проверка соответствия данных и размеров
+    if image_mode == "1":
+        # Для режима "1" каждый байт содержит 8 пикселей
+        expected_pixels = width * height
+        expected_bytes = (expected_pixels + 7) // 8  # Округление вверх
+        if len(image_data) < expected_bytes:
+            raise ValueError(f"Недостаточно данных для режима '1'. Ожидалось {expected_bytes} байт, получено {len(image_data)}.")
+        image_data = np.unpackbits(image_data)[:expected_pixels]  # Обрезаем лишние данные
+        image_data = image_data.reshape((height, width))
+    elif image_mode == "L":
+        expected_pixels = width * height
+        if len(image_data) < expected_pixels:
+            raise ValueError(f"Недостаточно данных для режима 'L'. Ожидалось {expected_pixels} байт, получено {len(image_data)}.")
+        image_data = image_data.reshape((height, width))
+    elif image_mode == "RGB":
+        expected_pixels = width * height * 3
+        if len(image_data) < expected_pixels:
+            raise ValueError(f"Недостаточно данных для режима 'RGB'. Ожидалось {expected_pixels} байт, получено {len(image_data)}.")
+        image_data = image_data.reshape((height, width, 3))
+    else:
+        raise ValueError(f"Неподдерживаемый режим изображения: {image_mode}")
+
+    # Создаем изображение
+    image = Image.fromarray(image_data, mode=image_mode)
+
+    # Сохраняем изображение
+    image.save(output_image_path)
+
+    print(f"RAW-файл {input_raw_path} преобразован в изображение: {output_image_path}")
+
+
+# Основная функция
 if __name__ == "__main__":
-    # Обработка файла enwik7 (английский текст)
-    input_data = "C:/OPP/compression_project/tests/test1_enwik7"
-    compress_data = "C:/OPP/compression_project/results/compressed/test1/c_enwik7_lz77.bin"  # Уточняем, что используется LZ77
-    decompress_data = "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_lz77.txt"
+    # Пути к RAW-файлам
+    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
+    gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
+    color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
 
-    # Сжимаем файл enwik7 с использованием LZ77
-    compress_file(input_data, compress_data)
-    print("Сжатие enwik7 с использованием LZ77 завершено.")
+    # Пути для сохранения сжатых файлов
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
 
-    # Распаковываем файл
-    decompress_file(compress_data, decompress_data)
-    print("Распаковка enwik7 завершена.")
+    # Сжатие RAW-файлов с использованием LZ77
+    compress_file(bw_raw_path, bw_compressed_path)
+    compress_file(gray_raw_path, gray_compressed_path)
+    compress_file(color_raw_path, color_compressed_path)
 
-    # Анализируем сжатие
-    analyze_compression(input_data, compress_data)
-    print("Анализ сжатия enwik7 завершен.")
-    print("-" * 40)
+    # Анализ сжатия
+    print("Черно-белое изображение:")
+    analyze_compression(bw_raw_path, bw_compressed_path)
 
-    # Обработка файла test2 (русский текст)
-    input_data_ru = "C:/OPP/compression_project/tests/test2_rus.txt"
-    compress_data_ru = "C:/OPP/compression_project/results/compressed/test2/rus_lz77.bin"  # Уточняем, что используется LZ77
-    decompress_data_ru = "C:/OPP/compression_project/results/decompressors/test2/rus_lz77.txt"
+    print("Серое изображение:")
+    analyze_compression(gray_raw_path, gray_compressed_path)
 
-    # Сжимаем файл test2 с использованием LZ77
-    compress_file(input_data_ru, compress_data_ru)
-    print("Сжатие русского текста с использованием LZ77 завершено.")
+    print("Цветное изображение:")
+    analyze_compression(color_raw_path, color_compressed_path)
 
-    # Распаковываем файл
-    decompress_file(compress_data_ru, decompress_data_ru)
-    print("Распаковка русского текста завершена.")
+    # Пути для восстановленных RAW-файлов
+    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
+    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
+    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw"
 
-    # Анализируем сжатие
-    analyze_compression(input_data_ru, compress_data_ru)
-    print("Анализ сжатия русского текста завершен.")
-    print("-" * 40)
+    # Декомпрессия RAW-файлов с использованием LZ77
+    decompress_file(bw_compressed_path, bw_decompressed_raw_path)
+    decompress_file(gray_compressed_path, gray_decompressed_raw_path)
+    decompress_file(color_compressed_path, color_decompressed_raw_path)
 
-    # Обработка бинарного файла
-    binary_input = "C:/OPP/compression_project/tests/test3_bin.exe"
-    binary_compressed = "C:/OPP/compression_project/results/compressed/test3/binary_file_lz77.bin"  # Уточняем, что используется LZ77
-    binary_decompressed = "C:/OPP/compression_project/results/decompressors/test3/binary_file_lz77_decompressed.bin"
-
-    # Сжимаем бинарный файл с использованием LZ77
-    compress_file(binary_input, binary_compressed)
-    print("Сжатие бинарного файла с использованием LZ77 завершено.")
-
-    # Распаковываем бинарный файл
-    decompress_file(binary_compressed, binary_decompressed)
-    print("Распаковка бинарного файла завершена.")
-
-    # Анализируем сжатие
-    analyze_compression(binary_input, binary_compressed)
-    print("Анализ сжатия бинарного файла завершен.")
-    print("-" * 40)
-
-    print("Все операции завершены.")
+    # Преобразование RAW обратно в изображения
+    convert_raw_to_image(bw_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.png", "1")
+    convert_raw_to_image(gray_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.png", "L")
+    convert_raw_to_image(color_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.png", "RGB")
