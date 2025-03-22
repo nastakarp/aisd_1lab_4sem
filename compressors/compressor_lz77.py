@@ -1,7 +1,7 @@
 import os
 import math
 from collections import Counter
-BLOCK_SIZE = 32*1024
+
 def calculate_compression_ratio(original_size: int, compressed_size: int) -> float:
     """
     Рассчитывает коэффициент сжатия.
@@ -65,14 +65,7 @@ def analyze_compression(input_file: str, compressed_file: str):
 
 import os
 from collections import deque
-
 def lz77_encode(data: bytes, buffer_size: int = 512) -> bytes:
-    """
-    Кодирование данных с использованием алгоритма LZ77.
-    :param data: Входные данные (байтовая строка).
-    :param buffer_size: Размер буфера.
-    :return: Сжатые данные (байтовая строка).
-    """
     compressed_data = []
     i = 0
     while i < len(data):
@@ -97,6 +90,10 @@ def lz77_encode(data: bytes, buffer_size: int = 512) -> bytes:
         # Получаем следующий символ
         next_char = data[i + match_length] if i + match_length < len(data) else 0
 
+        # Проверяем, что match_offset не превышает длину буфера
+        if match_offset > len(buffer):
+            match_offset, match_length = 0, 0  # Сбрасываем, если offset некорректен
+
         # Добавляем тройку (offset, length, next_char) в сжатые данные
         compressed_data.append(match_offset)
         compressed_data.append(match_length)
@@ -105,7 +102,6 @@ def lz77_encode(data: bytes, buffer_size: int = 512) -> bytes:
         # Перемещаем указатель
         i += match_length + 1
 
-    # Преобразуем список в байты
     return bytes(compressed_data)
 
 def lz77_decode(compressed_data: bytes) -> bytes:
@@ -114,31 +110,36 @@ def lz77_decode(compressed_data: bytes) -> bytes:
     :param compressed_data: Сжатые данные (байтовая строка).
     :return: Восстановленные данные (байтовая строка).
     """
-    decompressed_data = []
-    i = 0
-    while i + 2 < len(compressed_data):  # Проверяем, что осталось достаточно данных для тройки
-        match_offset = compressed_data[i]
-        match_length = compressed_data[i + 1]
-        next_char = compressed_data[i + 2]
+    decompressed_data = []  # Здесь хранятся декодированные данные
+    i = 0  # Индекс для прохода по сжатым данным
 
-        # Проверяем, что match_offset и match_length допустимы
+    # Проходим по сжатым данным блоками по 3 байта (offset, length, next_char)
+    while i + 2 < len(compressed_data):
+        match_offset = compressed_data[i]  # Смещение назад
+        match_length = compressed_data[i + 1]  # Длина совпадения
+        next_char = compressed_data[i + 2]  # Следующий символ
+
+        # Если offset и length равны 0, это конец данных
         if match_offset == 0 and match_length == 0:
-            # Если offset и length равны 0, это конец данных
             break
 
         # Проверяем, что match_offset не превышает длину decompressed_data
         if match_offset > len(decompressed_data):
-            # Если offset больше, чем текущая длина данных, добавляем нулевые байты
-            decompressed_data.extend([0] * match_length)
-        else:
-            # Восстанавливаем данные
-            for _ in range(match_length):
-                decompressed_data.append(decompressed_data[-match_offset])
+            # Если offset больше, чем текущая длина данных, это ошибка
+            raise ValueError(
+                f"Invalid match_offset: {match_offset} > {len(decompressed_data)}. "
+                f"Data may be corrupted or compression algorithm is incorrect."
+            )
+
+        # Восстанавливаем данные
+        for _ in range(match_length):
+            # Копируем символ из уже декодированных данных
+            decompressed_data.append(decompressed_data[-match_offset])
 
         # Добавляем следующий символ
         decompressed_data.append(next_char)
 
-        # Перемещаем указатель
+        # Перемещаем указатель на следующую тройку
         i += 3
 
     return bytes(decompressed_data)
@@ -146,11 +147,9 @@ def lz77_decode(compressed_data: bytes) -> bytes:
 def compress_file(input_file: str, output_file: str, buffer_size: int = 512):
     """
     Сжимает файл с использованием алгоритма LZ77.
-    :param BLOCK_SIZE:
     :param input_file: Путь к исходному файлу.
     :param output_file: Путь к файлу для сохранения сжатых данных.
     :param buffer_size: Размер буфера для LZ77.
-    :param block_size: Размер блока для чтения данных.
     """
     # Проверяем, существует ли директория для выходного файла
     output_dir = os.path.dirname(output_file)
@@ -158,21 +157,9 @@ def compress_file(input_file: str, output_file: str, buffer_size: int = 512):
         os.makedirs(output_dir)
 
     with open(input_file, "rb") as f_in, open(output_file, "wb") as f_out:
-        overlap = buffer_size  # Перекрытие между блоками
-        prev_block = bytes()  # Хранит последние `overlap` байт предыдущего блока
-
-        while True:
-            block = f_in.read(BLOCK_SIZE)
-            if not block:
-                break
-
-            # Добавляем перекрытие из предыдущего блока
-            combined_block = prev_block + block
-            compressed_block = lz77_encode(combined_block, buffer_size)
-            f_out.write(compressed_block)
-
-            # Сохраняем последние `overlap` байт для следующего блока
-            prev_block = combined_block[-overlap:] if len(combined_block) >= overlap else combined_block
+        data = f_in.read()  # Читаем весь файл
+        compressed_data = lz77_encode(data, buffer_size)  # Сжимаем целиком
+        f_out.write(compressed_data)
 
 def decompress_file(input_file: str, output_file: str):
     """
@@ -186,13 +173,9 @@ def decompress_file(input_file: str, output_file: str):
         os.makedirs(output_dir)
 
     with open(input_file, "rb") as f_in, open(output_file, "wb") as f_out:
-        while True:
-            compressed_block = f_in.read(BLOCK_SIZE)  # Читаем сжатые данные блоками
-            if not compressed_block:
-                break
-
-            decompressed_block = lz77_decode(compressed_block)
-            f_out.write(decompressed_block)
+        compressed_data = f_in.read()  # Читаем весь сжатый файл
+        decompressed_data = lz77_decode(compressed_data)  # Декодируем целиком
+        f_out.write(decompressed_data)  # Записываем восстановленные данные
 
 # Пример использования
 if __name__ == "__main__":
