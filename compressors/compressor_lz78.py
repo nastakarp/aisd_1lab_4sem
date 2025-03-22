@@ -3,7 +3,7 @@ import math
 import struct
 from collections import Counter
 
-# Функции для анализа сжатия (из предыдущего кода)
+# Функции для анализа сжатия
 def calculate_compression_ratio(original_size: int, compressed_size: int) -> float:
     return original_size / compressed_size
 
@@ -38,7 +38,7 @@ def analyze_compression(input_file: str, compressed_file: str):
     print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
     print("-" * 40)
 
-# Реализация LZ78 (из вашего кода)
+# Реализация LZ78
 class LZ78Encoder:
     def __init__(self):
         self.dictionary = {}
@@ -71,9 +71,12 @@ class LZ78Decoder:
         decoded_data = []
         for code, byte in encoded_data:
             if code == 0:
-                decoded_data.append(bytes([byte]))
-                self.dictionary[len(self.dictionary)] = bytes([byte])
+                new_string = bytes([byte])
+                decoded_data.append(new_string)
+                self.dictionary[len(self.dictionary)] = new_string
             else:
+                if code not in self.dictionary:
+                    continue
                 string = self.dictionary[code]
                 if byte != 0:
                     new_string = string + bytes([byte])
@@ -84,45 +87,27 @@ class LZ78Decoder:
         return b"".join(decoded_data)
 
 def compress_lz78(data: bytes) -> bytes:
-    """
-    Компрессор: LZ78.
-    :param data: Входные данные (байтовая строка).
-    :return: Сжатые данные (байтовая строка).
-    """
     encoder = LZ78Encoder()
     encoded_data = encoder.encode(data)
-
-    # Преобразуем список кортежей в байты
     compressed_data = []
     for code, byte in encoded_data:
-        # Упаковываем код (2 байта) и байт (1 байт)
-        compressed_data.extend(struct.pack(">HB", code, byte))
+        packed_data = struct.pack(">IB", code, byte)
+        compressed_data.append(packed_data)
     return b"".join(compressed_data)
 
 def decompress_lz78(compressed_data: bytes) -> bytes:
-    """
-    Декомпрессор: LZ78.
-    :param compressed_data: Сжатые данные (байтовая строка).
-    :return: Восстановленные данные (байтовая строка).
-    """
-    # Преобразуем байты в список кортежей
     encoded_data = []
-    for i in range(0, len(compressed_data), 3):
-        # Распаковываем код (2 байта) и байт (1 байт)
-        code, byte = struct.unpack_from(">HB", compressed_data, i)
-        encoded_data.append((code, byte))
-
-    # Декодируем LZ78
+    for i in range(0, len(compressed_data), 5):
+        try:
+            code, byte = struct.unpack_from(">IB", compressed_data, i)
+            encoded_data.append((code, byte))
+        except struct.error as e:
+            raise
     decoder = LZ78Decoder()
     return decoder.decode(encoded_data)
 
 # Функции для работы с файлами
 def compress_file_lz78(input_file: str, output_file: str):
-    """
-    Сжимает файл с использованием алгоритма LZ78.
-    :param input_file: Путь к исходному файлу.
-    :param output_file: Путь к файлу для сохранения сжатых данных.
-    """
     output_dir = os.path.dirname(output_file)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -133,11 +118,6 @@ def compress_file_lz78(input_file: str, output_file: str):
         f_out.write(compressed_data)
 
 def decompress_file_lz78(input_file: str, output_file: str):
-    """
-    Распаковывает файл, сжатый алгоритмом LZ78.
-    :param input_file: Путь к сжатому файлу.
-    :param output_file: Путь к файлу для сохранения восстановленных данных.
-    """
     output_dir = os.path.dirname(output_file)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -154,15 +134,12 @@ if __name__ == "__main__":
     compress_data = "C:/OPP/compression_project/results/compressed/test1/c_enwik7_lz78.bin"
     decompress_data = "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_lz78.txt"
 
-    # Сжимаем файл enwik7 с использованием LZ78
     compress_file_lz78(input_data, compress_data)
     print("Сжатие enwik7 с использованием LZ78 завершено.")
 
-    # Распаковываем файл
     decompress_file_lz78(compress_data, decompress_data)
     print("Распаковка enwik7 завершена.")
 
-    # Анализируем сжатие
     analyze_compression(input_data, compress_data)
     print("Анализ сжатия enwik7 завершен.")
     print("-" * 40)
@@ -172,15 +149,12 @@ if __name__ == "__main__":
     compress_data_ru = "C:/OPP/compression_project/results/compressed/test2/rus_lz78.bin"
     decompress_data_ru = "C:/OPP/compression_project/results/decompressors/test2/rus_lz78.txt"
 
-    # Сжимаем файл test2 с использованием LZ78
     compress_file_lz78(input_data_ru, compress_data_ru)
     print("Сжатие русского текста с использованием LZ78 завершено.")
 
-    # Распаковываем файл
     decompress_file_lz78(compress_data_ru, decompress_data_ru)
     print("Распаковка русского текста завершена.")
 
-    # Анализируем сжатие
     analyze_compression(input_data_ru, compress_data_ru)
     print("Анализ сжатия русского текста завершен.")
     print("-" * 40)
@@ -190,15 +164,12 @@ if __name__ == "__main__":
     binary_compressed = "C:/OPP/compression_project/results/compressed/test3/binary_file_lz78.bin"
     binary_decompressed = "C:/OPP/compression_project/results/decompressors/test3/binary_file_lz78_decompressed.bin"
 
-    # Сжимаем бинарный файл с использованием LZ78
     compress_file_lz78(binary_input, binary_compressed)
     print("Сжатие бинарного файла с использованием LZ78 завершено.")
 
-    # Распаковываем бинарный файл
     decompress_file_lz78(binary_compressed, binary_decompressed)
     print("Распаковка бинарного файла завершена.")
 
-    # Анализируем сжатие
     analyze_compression(binary_input, binary_compressed)
     print("Анализ сжатия бинарного файла завершен.")
     print("-" * 40)
