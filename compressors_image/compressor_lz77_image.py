@@ -280,6 +280,6 @@ if __name__ == "__main__":
     decompress_file(color_compressed_path, color_decompressed_raw_path)
 
     # Преобразование RAW обратно в изображения
-    convert_raw_to_image(bw_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.png", "1")
-    convert_raw_to_image(gray_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.png", "L")
-    convert_raw_to_image(color_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.png", "RGB")
+    #convert_raw_to_image(bw_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.png", "1")
+    #convert_raw_to_image(gray_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.png", "L")
+    #convert_raw_to_image(color_decompressed_raw_path, "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.png", "RGB")
