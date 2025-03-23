@@ -125,14 +125,10 @@ class LZ78Decoder:
                 if code not in self.dictionary:
                     raise ValueError(f"Код {code} отсутствует в словаре. Данные повреждены.")
                 string = self.dictionary[code]
-                if byte != 0:
-                    # Добавляем новый символ к строке и обновляем словарь
-                    new_string = string + bytes([byte])
-                    decoded_data.append(new_string)
-                    self.dictionary[len(self.dictionary)] = new_string
-                else:
-                    # Если байт равен 0, просто добавляем строку
-                    decoded_data.append(string)
+                new_string = string + bytes([byte]) if byte != 0 else string
+                decoded_data.append(new_string)
+                # Добавляем новую строку в словарь
+                self.dictionary[len(self.dictionary)] = new_string
         return b"".join(decoded_data)
 
 
@@ -165,15 +161,14 @@ def decompress_lz78(compressed_data: bytes) -> bytes:
     encoded_data = []
     for i in range(0, len(compressed_data), 3):
         try:
-            code = int.from_bytes(compressed_data[i:i + 2], byteorder="big")
-            byte = compressed_data[i + 2]
+            code = int.from_bytes(compressed_data[i:i+2], byteorder="big")
+            byte = compressed_data[i+2]
             encoded_data.append((code, byte))
         except struct.error as e:
             raise ValueError(f"Ошибка при распаковке данных: {e}")
 
     decoder = LZ78Decoder()
     return decoder.decode(encoded_data)
-
 
 def compress_file(input_file: str, output_file: str):
     """
