@@ -53,21 +53,29 @@ def analyze_file(file_path: str):
     return file_size, entropy
 
 
-def analyze_compression(input_file: str, compressed_file: str):
+def analyze_compression(input_file: str, compressed_file: str, decompressed_file: str):
     """
-    Анализирует сжатие файла: рассчитывает коэффициент сжатия и энтропию.
+    Анализирует сжатие файла: рассчитывает коэффициент сжатия, энтропию и размер декомпрессированного файла.
     :param input_file: Путь к исходному файлу.
     :param compressed_file: Путь к сжатому файлу.
+    :param decompressed_file: Путь к декомпрессированному файлу.
     """
+    # Анализируем исходный файл
     original_size, original_entropy = analyze_file(input_file)
+    # Анализируем сжатый файл
     compressed_size, compressed_entropy = analyze_file(compressed_file)
+    # Анализируем декомпрессированный файл
+    decompressed_size, _ = analyze_file(decompressed_file)
 
+    # Рассчитываем коэффициент сжатия
     compression_ratio = calculate_compression_ratio(original_size, compressed_size)
 
+    # Выводим результаты
     print(f"Файл: {input_file}")
     print(f"Размер исходного файла: {original_size} байт")
     print(f"Размер сжатого файла: {compressed_size} байт")
-    print(f"Коэффициент сжатия: {compression_ratio:.2f}")
+    print(f"Размер декомпрессированного файла: {decompressed_size} байт")
+    print(f"Коэффициент сжатия: {compression_ratio:.3f}")
     print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
     print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
     print("-" * 40)
@@ -175,6 +183,7 @@ def decompress_file(input_file: str, output_file: str):
 
 # Пример использования
 if __name__ == "__main__":
+    # Обработка файла enwik7
     input_data = "C:/OPP/compression_project/tests/test1_enwik7"
     compress_data = "C:/OPP/compression_project/results/compressed/test1/c_enwik7_ha.bin"
     decompress_data = "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_ha.txt"
@@ -183,7 +192,7 @@ if __name__ == "__main__":
     # Распаковываем файл
     decompress_file(compress_data, decompress_data)
     # Анализируем сжатие
-    analyze_compression(input_data, compress_data)
+    analyze_compression(input_data, compress_data, decompress_data)
     print("Сжатие и распаковка enwik7 завершены.")
 
     # Обработка файла test2 (русский текст)
@@ -195,7 +204,7 @@ if __name__ == "__main__":
     # Распаковываем файл
     decompress_file(compress_data_ru, decompress_data_ru)
     # Анализируем сжатие
-    analyze_compression(input_data_ru, compress_data_ru)
+    analyze_compression(input_data_ru, compress_data_ru, decompress_data_ru)
     print("Сжатие и распаковка русского текста завершены.")
 
     # Обработка бинарного файла
@@ -205,5 +214,5 @@ if __name__ == "__main__":
     compress_file(binary_input, binary_compressed)
     decompress_file(binary_compressed, binary_decompressed)
     # Анализируем сжатие
-    analyze_compression(binary_input, binary_compressed)
+    analyze_compression(binary_input, binary_compressed, binary_decompressed)
     print("Бинарный файл сжат и распакован.")
