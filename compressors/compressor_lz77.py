@@ -212,7 +212,7 @@ def test_buffer_sizes(input_file: str, output_dir: str, buffer_sizes: list):
 
 if __name__ == "__main__":
     # Параметры тестирования
-    buffer_sizes = [2*16384]  # Размеры буфера для тестирования
+    buffer_sizes = [16384]  # Размеры буфера для тестирования
     '''
     # Обработка файла enwik7 (английский текст)
     input_enwik7 = "C:/OPP/compression_project/tests/test1_enwik7"
