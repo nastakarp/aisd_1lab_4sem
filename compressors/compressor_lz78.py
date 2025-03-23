@@ -25,17 +25,35 @@ def analyze_file(file_path: str):
     entropy = calculate_entropy(data)
     return file_size, entropy
 
-def analyze_compression(input_file: str, compressed_file: str):
+def analyze_compression(input_file: str, compressed_file: str, decompressed_file: str):
+    """
+    Анализирует сжатие файла.
+    :param input_file: Путь к исходному файлу.
+    :param compressed_file: Путь к сжатому файлу.
+    :param decompressed_file: Путь к восстановленному файлу.
+    """
+    # Анализ исходного файла
     original_size, original_entropy = analyze_file(input_file)
-    compressed_size, compressed_entropy = analyze_file(compressed_file)
-    compression_ratio = calculate_compression_ratio(original_size, compressed_size)
-
     print(f"Файл: {input_file}")
     print(f"Размер исходного файла: {original_size} байт")
+    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
+
+    # Анализ сжатого файла
+    compressed_size, compressed_entropy = analyze_file(compressed_file)
+    compression_ratio = calculate_compression_ratio(original_size, compressed_size)
     print(f"Размер сжатого файла: {compressed_size} байт")
     print(f"Коэффициент сжатия: {compression_ratio:.2f}")
-    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
     print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
+
+    # Анализ восстановленного файла
+    decompressed_size, _ = analyze_file(decompressed_file)
+    print(f"Размер восстановленного файла: {decompressed_size} байт")
+
+    # Проверка совпадения размеров исходного и восстановленного файлов
+    if original_size == decompressed_size:
+        print("Размеры исходного и восстановленного файлов совпадают.")
+    else:
+        print("Ошибка: размеры исходного и восстановленного файлов не совпадают.")
     print("-" * 40)
 
 # Реализация LZ78
@@ -140,7 +158,7 @@ if __name__ == "__main__":
     decompress_file_lz78(compress_data, decompress_data)
     print("Распаковка enwik7 завершена.")
 
-    analyze_compression(input_data, compress_data)
+    analyze_compression(input_data, compress_data, decompress_data)
     print("Анализ сжатия enwik7 завершен.")
     print("-" * 40)
 
@@ -155,7 +173,7 @@ if __name__ == "__main__":
     decompress_file_lz78(compress_data_ru, decompress_data_ru)
     print("Распаковка русского текста завершена.")
 
-    analyze_compression(input_data_ru, compress_data_ru)
+    analyze_compression(input_data_ru, compress_data_ru, decompress_data_ru)
     print("Анализ сжатия русского текста завершен.")
     print("-" * 40)
 
@@ -170,7 +188,7 @@ if __name__ == "__main__":
     decompress_file_lz78(binary_compressed, binary_decompressed)
     print("Распаковка бинарного файла завершена.")
 
-    analyze_compression(binary_input, binary_compressed)
+    analyze_compression(binary_input, binary_compressed, binary_decompressed)
     print("Анализ сжатия бинарного файла завершен.")
     print("-" * 40)
 

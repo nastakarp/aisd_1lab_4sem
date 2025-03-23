@@ -51,23 +51,35 @@ def analyze_file(file_path: str):
     return file_size, entropy
 
 
-def analyze_compression(input_file: str, compressed_file: str):
+def analyze_compression(input_file: str, compressed_file: str, decompressed_file: str):
     """
-    Анализирует сжатие файла: рассчитывает коэффициент сжатия и энтропию.
+    Анализирует сжатие файла: рассчитывает коэффициент сжатия, энтропию и проверяет размер восстановленного файла.
     :param input_file: Путь к исходному файлу.
     :param compressed_file: Путь к сжатому файлу.
+    :param decompressed_file: Путь к восстановленному файлу.
     """
+    # Анализ исходного файла
     original_size, original_entropy = analyze_file(input_file)
-    compressed_size, compressed_entropy = analyze_file(compressed_file)
-
-    compression_ratio = calculate_compression_ratio(original_size, compressed_size)
-
     print(f"Файл: {input_file}")
     print(f"Размер исходного файла: {original_size} байт")
+    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
+
+    # Анализ сжатого файла
+    compressed_size, compressed_entropy = analyze_file(compressed_file)
+    compression_ratio = calculate_compression_ratio(original_size, compressed_size)
     print(f"Размер сжатого файла: {compressed_size} байт")
     print(f"Коэффициент сжатия: {compression_ratio:.2f}")
-    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
     print(f"Энтропия сжатого файла: {compressed_entropy:.2f} бит/символ")
+
+    # Анализ восстановленного файла
+    decompressed_size, _ = analyze_file(decompressed_file)
+    print(f"Размер восстановленного файла: {decompressed_size} байт")
+
+    # Проверка совпадения размеров исходного и восстановленного файлов
+    if original_size == decompressed_size:
+        print("Размеры исходного и восстановленного файлов совпадают.")
+    else:
+        print("Ошибка: размеры исходного и восстановленного файлов не совпадают.")
     print("-" * 40)
 
 
@@ -144,8 +156,7 @@ def compress_lz78(data: bytes) -> bytes:
     # Преобразуем список кортежей в байты
     compressed_data = []
     for code, byte in encoded_data:
-        compressed_data.append(code.to_bytes(2, byteorder="big"))  # Код (2 байта)
-        compressed_data.append(bytes([byte]))  # Символ (1 байт)
+        compressed_data.append(struct.pack(">HB", code, byte))  # Код (2 байта) и символ (1 байт)
     return b"".join(compressed_data)
 
 
@@ -161,14 +172,14 @@ def decompress_lz78(compressed_data: bytes) -> bytes:
     encoded_data = []
     for i in range(0, len(compressed_data), 3):
         try:
-            code = int.from_bytes(compressed_data[i:i+2], byteorder="big")
-            byte = compressed_data[i+2]
+            code, byte = struct.unpack_from(">HB", compressed_data, i)
             encoded_data.append((code, byte))
         except struct.error as e:
             raise ValueError(f"Ошибка при распаковке данных: {e}")
 
     decoder = LZ78Decoder()
     return decoder.decode(encoded_data)
+
 
 def compress_file(input_file: str, output_file: str):
     """
@@ -221,16 +232,6 @@ if __name__ == "__main__":
     compress_file(gray_raw_path, gray_compressed_path)
     compress_file(color_raw_path, color_compressed_path)
 
-    # Анализ сжатия
-    print("Черно-белое изображение:")
-    analyze_compression(bw_raw_path, bw_compressed_path)
-
-    print("Серое изображение:")
-    analyze_compression(gray_raw_path, gray_compressed_path)
-
-    print("Цветное изображение:")
-    analyze_compression(color_raw_path, color_compressed_path)
-
     # Пути для восстановленных RAW-файлов
     bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
     gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
@@ -240,5 +241,15 @@ if __name__ == "__main__":
     decompress_file(bw_compressed_path, bw_decompressed_raw_path)
     decompress_file(gray_compressed_path, gray_decompressed_raw_path)
     decompress_file(color_compressed_path, color_decompressed_raw_path)
+
+    # Анализ сжатия
+    print("Черно-белое изображение:")
+    analyze_compression(bw_raw_path, bw_compressed_path, bw_decompressed_raw_path)
+
+    print("Серое изображение:")
+    analyze_compression(gray_raw_path, gray_compressed_path, gray_decompressed_raw_path)
+
+    print("Цветное изображение:")
+    analyze_compression(color_raw_path, color_compressed_path, color_decompressed_raw_path)
 
     print("Все операции завершены.")
