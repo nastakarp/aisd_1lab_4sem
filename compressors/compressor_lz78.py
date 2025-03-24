@@ -59,68 +59,104 @@ def analyze_compression(input_file: str, compressed_file: str, decompressed_file
 # Реализация LZ78
 class LZ78Encoder:
     def __init__(self):
-        self.dictionary = {}
+        self.dictionary = {b'': 0}
         self.next_code = 1
 
     def encode(self, data: bytes) -> list:
         encoded_data = []
-        current_string = b""
+        current_string = b''
+
         for byte in data:
             new_string = current_string + bytes([byte])
-            if new_string not in self.dictionary:
+            if new_string in self.dictionary:
+                current_string = new_string
+            else:
+                encoded_data.append((self.dictionary[current_string], byte))
                 self.dictionary[new_string] = self.next_code
                 self.next_code += 1
-                if current_string:
-                    encoded_data.append((self.dictionary[current_string], byte))
-                else:
-                    encoded_data.append((0, byte))
-                current_string = b""
-            else:
-                current_string = new_string
+                current_string = b''
+
         if current_string:
-            encoded_data.append((self.dictionary[current_string], 0))
+            # Для последней последовательности используем byte=256 как маркер конца
+            encoded_data.append((self.dictionary[current_string], 256))
+
         return encoded_data
+
 
 class LZ78Decoder:
     def __init__(self):
-        self.dictionary = {0: b""}
+        self.dictionary = {0: b''}
 
     def decode(self, encoded_data: list) -> bytes:
         decoded_data = []
+
         for code, byte in encoded_data:
-            if code == 0:
-                new_string = bytes([byte])
-                decoded_data.append(new_string)
-                self.dictionary[len(self.dictionary)] = new_string
+            if code not in self.dictionary:
+                raise ValueError(f"Invalid code {code} in encoded data")
+
+            if byte == 256:  # Маркер конца
+                entry = self.dictionary[code]
             else:
-                if code not in self.dictionary:
-                    continue
-                string = self.dictionary[code]
-                if byte != 0:
-                    new_string = string + bytes([byte])
-                    decoded_data.append(new_string)
-                    self.dictionary[len(self.dictionary)] = new_string
-                else:
-                    decoded_data.append(string)
-        return b"".join(decoded_data)
+                entry = self.dictionary[code] + bytes([byte])
+                # Добавляем в словарь только если это не последняя запись
+                if byte != 256:
+                    self.dictionary[len(self.dictionary)] = entry
+
+            decoded_data.append(entry)
+
+        return b''.join(decoded_data)
+
 
 def compress_lz78(data: bytes) -> bytes:
     encoder = LZ78Encoder()
     encoded_data = encoder.encode(data)
-    compressed_data = []
+
+    # Определяем необходимый размер для хранения кодов
+    max_code = max((code for code, _ in encoded_data), default=0)
+    code_bytes = (max_code.bit_length() + 7) // 8
+    code_bytes = max(1, code_bytes)  # Минимум 1 байт
+
+    compressed_data = bytearray()
     for code, byte in encoded_data:
-        packed_data = struct.pack(">IB", code, byte)
-        compressed_data.append(packed_data)
-    return b"".join(compressed_data)
+        compressed_data.extend(code.to_bytes(code_bytes, 'big'))
+        # Для byte=256 используем 2 байта
+        if byte == 256:
+            compressed_data.extend((255, 255))
+        else:
+            compressed_data.append(byte)
+
+    # Добавляем заголовок (размер кода и маркер версии)
+    header = bytes([code_bytes, 1])  # Версия 1
+    return header + compressed_data
+
 
 def decompress_lz78(compressed_data: bytes) -> bytes:
+    if len(compressed_data) < 2:
+        return b''
+
+    code_bytes, version = compressed_data[:2]
+    if version != 1:
+        raise ValueError("Unsupported compression version")
+
     encoded_data = []
-    for i in range(0, len(compressed_data), 5):
-        try:
-            code, byte = struct.unpack_from(">IB", compressed_data, i)
-            encoded_data.append((code, byte))
-        except struct.error as e:
-            raise
+    pos = 2
+    while pos + code_bytes <= len(compressed_data):
+        code = int.from_bytes(compressed_data[pos:pos + code_bytes], 'big')
+        pos += code_bytes
+
+        if pos >= len(compressed_data):
+            break
+
+        byte = compressed_data[pos]
+        pos += 1
+
+        # Обработка маркера 255,255
+        if byte == 255 and pos < len(compressed_data) and compressed_data[pos] == 255:
+            byte = 256
+            pos += 1
+
+        encoded_data.append((code, byte))
+
     decoder = LZ78Decoder()
     return decoder.decode(encoded_data)
 
@@ -191,5 +227,39 @@ if __name__ == "__main__":
     analyze_compression(binary_input, binary_compressed, binary_decompressed)
     print("Анализ сжатия бинарного файла завершен.")
     print("-" * 40)
+    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
+    gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
+    color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
 
+    # Пути для сохранения сжатых файлов
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
+
+    # Сжатие RAW-файлов с использованием LZ78
+    compress_file_lz78(bw_raw_path, bw_compressed_path)
+    compress_file_lz78(gray_raw_path, gray_compressed_path)
+    compress_file_lz78(color_raw_path, color_compressed_path)
+
+    # Пути для восстановленных RAW-файлов
+    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
+    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
+    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw"
+
+    # Декомпрессия RAW-файлов с использованием LZ78
+    decompress_file_lz78(bw_compressed_path, bw_decompressed_raw_path)
+    decompress_file_lz78(gray_compressed_path, gray_decompressed_raw_path)
+    decompress_file_lz78(color_compressed_path, color_decompressed_raw_path)
+
+    # Анализ сжатия
+    print("Черно-белое изображение:")
+    analyze_compression(bw_raw_path, bw_compressed_path, bw_decompressed_raw_path)
+
+    print("Серое изображение:")
+    analyze_compression(gray_raw_path, gray_compressed_path, gray_decompressed_raw_path)
+
+    print("Цветное изображение:")
+    analyze_compression(color_raw_path, color_compressed_path, color_decompressed_raw_path)
+
+    print("Все операции завершены.")
     print("Все операции завершены.")

@@ -180,6 +180,45 @@ def decompress_file(input_file: str, output_file: str):
         f.write(decompressed_data)
 
 
+def compress_raw_file(input_raw_path: str, output_compressed_path: str):
+    """
+    Сжимает RAW-файл с использованием алгоритма Хаффмана.
+    :param input_raw_path: Путь к RAW-файлу.
+    :param output_compressed_path: Путь для сохранения сжатого файла.
+    """
+    # Чтение RAW-файла
+    with open(input_raw_path, "rb") as f:
+        raw_data = f.read()
+
+    # Сжатие данных
+    compressed_data = huffman_compress(raw_data)
+
+    # Сохранение сжатых данных
+    with open(output_compressed_path, "wb") as f:
+        f.write(compressed_data)
+
+    print(f"RAW-файл {input_raw_path} сжат и сохранен в {output_compressed_path}")
+
+
+# Декомпрессия RAW-файла
+def decompress_raw_file(input_compressed_path: str, output_raw_path: str):
+    """
+    Декомпрессия RAW-файла.
+    :param input_compressed_path: Путь к сжатому файлу.
+    :param output_raw_path: Путь для сохранения восстановленного RAW-файла.
+    """
+    # Чтение сжатого файла
+    with open(input_compressed_path, "rb") as f:
+        compressed_data = f.read()
+
+    # Декомпрессия данных
+    decompressed_data = huffman_decompress(compressed_data)
+
+    # Сохранение восстановленного RAW-файла
+    with open(output_raw_path, "wb") as f:
+        f.write(decompressed_data)
+
+    print(f"Сжатый файл {input_compressed_path} декомпрессирован в {output_raw_path}")
 
 # Пример использования
 if __name__ == "__main__":
@@ -216,3 +255,37 @@ if __name__ == "__main__":
     # Анализируем сжатие
     analyze_compression(binary_input, binary_compressed, binary_decompressed)
     print("Бинарный файл сжат и распакован.")
+    # Пути к исходным RAW-файлам
+    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
+    gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
+    color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
+
+    # Пути для сохранения сжатых файлов
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
+
+    # Сжатие RAW-файлов
+    compress_raw_file(bw_raw_path, bw_compressed_path)
+    compress_raw_file(gray_raw_path, gray_compressed_path)
+    compress_raw_file(color_raw_path, color_compressed_path)
+
+    # Пути для восстановленных RAW-файлов
+    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
+    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
+    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw"
+
+    # Декомпрессия RAW-файлов
+    decompress_raw_file(bw_compressed_path, bw_decompressed_raw_path)
+    decompress_raw_file(gray_compressed_path, gray_decompressed_raw_path)
+    decompress_raw_file(color_compressed_path, color_decompressed_raw_path)
+
+    # Анализ сжатия
+    print("Черно-белое изображение:")
+    analyze_compression(bw_raw_path, bw_compressed_path, bw_decompressed_raw_path)
+
+    print("Серое изображение:")
+    analyze_compression(gray_raw_path, gray_compressed_path, gray_decompressed_raw_path)
+
+    print("Цветное изображение:")
+    analyze_compression(color_raw_path, color_compressed_path, color_decompressed_raw_path)

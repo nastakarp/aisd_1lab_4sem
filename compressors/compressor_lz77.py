@@ -212,7 +212,7 @@ def test_buffer_sizes(input_file: str, output_dir: str, buffer_sizes: list):
 
 if __name__ == "__main__":
     # Параметры тестирования
-    buffer_sizes = [16384]  # Размеры буфера для тестирования
+    buffer_sizes = 16384 # Размеры буфера для тестирования
     '''
     # Обработка файла enwik7 (английский текст)
     input_enwik7 = "C:/OPP/compression_project/tests/test1_enwik7"
@@ -234,5 +234,40 @@ if __name__ == "__main__":
     print("Тестирование бинарного файла:")
     test_buffer_sizes(input_bin, output_bin, buffer_sizes)
     print("=" * 60)
+
+    '''    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
+    gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
+    color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
+
+    # Пути для сохранения сжатых файлов
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
+
+    # Сжатие RAW-файлов с использованием LZ77
+    compress_file(bw_raw_path, bw_compressed_path)
+    compress_file(gray_raw_path, gray_compressed_path)
+    compress_file(color_raw_path, color_compressed_path)
+
+    # Пути для восстановленных RAW-файлов
+    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
+    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
+    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw"
+
+    # Декомпрессия RAW-файлов с использованием LZ77
+    decompress_file(bw_compressed_path, bw_decompressed_raw_path)
+    decompress_file(gray_compressed_path, gray_decompressed_raw_path)
+    decompress_file(color_compressed_path, color_decompressed_raw_path)
+
+    # Анализ сжатия
+    print("Черно-белое изображение:")
+    analyze_compression(bw_raw_path, bw_compressed_path, bw_decompressed_raw_path)
+
+    print("Серое изображение:")
+    analyze_compression(gray_raw_path, gray_compressed_path, gray_decompressed_raw_path)
+
+    print("Цветное изображение:")
+    analyze_compression(color_raw_path, color_compressed_path, color_decompressed_raw_path)
+  '''
 
     print("Все тесты завершены.")
