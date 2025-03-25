@@ -1,8 +1,7 @@
+from algorithms.huffman import count_symb, build_huffman_tree, generate_codes
+import pickle
 import numpy as np
-import time
-import math
 import os
-import queue
 
 # Размер блока (64 КБ)
 BLOCK_SIZE = 64 * 1024
@@ -87,101 +86,65 @@ def mtf_inverse(transformed_data: bytes) -> bytes:
     return bytes(original_data)
 
 
-# Функции для Хаффмана (остаются без изменений)
-class Node():
-    def __init__(self, symbol=None, counter=None, left=None, right=None, parent=None):
-        self.symbol = symbol
-        self.counter = counter
-        self.left = left
-        self.right = right
-        self.parent = parent
+def huffman_compress(data: bytes) -> bytes:
+    """
+    Кодирование Хаффмана с сохранением таблицы кодов.
+    :param data: Входные данные (байтовая строка).
+    :return: Закодированные данные (байтовая строка).
+    """
+    frequency = count_symb(data)
+    huffman_tree = build_huffman_tree(frequency)
+    huffman_codes = generate_codes(huffman_tree)
 
-    def __lt__(self, other):
-        return self.counter < other.counter
+    encoded_bits = "".join([huffman_codes[byte] for byte in data])
+    padding = 8 - len(encoded_bits) % 8
+    if padding != 8:  # Добавляем padding только если он нужен
+        encoded_bits += "0" * padding
+    encoded_bytes = bytes([int(encoded_bits[i:i+8], 2) for i in range(0, len(encoded_bits), 8)])
 
+    # Сохраняем таблицу кодов и padding в сжатых данных
+    metadata = {
+        "codes": huffman_codes,
+        "padding": padding,
+    }
+    metadata_bytes = pickle.dumps(metadata)
+    return len(metadata_bytes).to_bytes(4, "big") + metadata_bytes + encoded_bytes
 
-def count_symb(data: bytes) -> np.ndarray:
-    counter = np.zeros(256, dtype=int)
-    for byte in data:
-        counter[byte] += 1
-    return counter
+def huffman_decompress(encoded_data: bytes) -> bytes:
+    """
+    Декодирование Хаффмана с использованием таблицы кодов.
+    :param encoded_data: Закодированные данные (байтовая строка).
+    :return: Восстановленные данные (байтовая строка).
+    """
+    # Извлекаем длину метаданных
+    metadata_length = int.from_bytes(encoded_data[:4], "big")
+    metadata_bytes = encoded_data[4:4+metadata_length]
+    encoded_bytes = encoded_data[4+metadata_length:]
 
+    # Восстанавливаем таблицу кодов и padding
+    metadata = pickle.loads(metadata_bytes)
+    huffman_codes = metadata["codes"]
+    padding = metadata["padding"]
 
-def huffman_compress(data: bytes) -> tuple[bytes, dict]:
-    C = count_symb(data)
-    list_of_leafs = []
-    Q = queue.PriorityQueue()
-    for i in range(256):
-        if C[i] != 0:
-            leaf = Node(symbol=i, counter=C[i])
-            list_of_leafs.append(leaf)
-            Q.put(leaf)
-    while Q.qsize() >= 2:
-        left_node = Q.get()
-        right_node = Q.get()
-        parent_node = Node(left=left_node, right=right_node)
-        left_node.parent = parent_node
-        right_node.parent = parent_node
-        parent_node.counter = left_node.counter + right_node.counter
-        Q.put(parent_node)
-    codes = {}
-    for leaf in list_of_leafs:
-        node = leaf
-        code = ""
-        while node.parent is not None:
-            if node.parent.left == node:
-                code = "0" + code
-            else:
-                code = "1" + code
-            node = node.parent
-        codes[leaf.symbol] = code
-    coded_message = ""
-    for byte in data:
-        coded_message += codes[byte]
-    padding = 8 - len(coded_message) % 8
-    coded_message += '0' * padding
-    coded_message = f"{padding:08b}" + coded_message
-    bytes_string = bytearray()
-    for i in range(0, len(coded_message), 8):
-        byte = coded_message[i:i + 8]
-        bytes_string.append(int(byte, 2))
-    return bytes(bytes_string), codes
+    # Преобразуем байты в битовую строку
+    encoded_bits = "".join([f"{byte:08b}" for byte in encoded_bytes])
+    if padding != 8:  # Удаляем padding только если он был добавлен
+        encoded_bits = encoded_bits[:-padding] if padding > 0 else encoded_bits
 
-
-def huffman_decompress(compressed_data: bytes, huffman_codes: dict) -> bytes:
-    padding = compressed_data[0]
-    coded_message = ""
-    for byte in compressed_data[1:]:
-        coded_message += f"{byte:08b}"
-    if padding > 0:
-        coded_message = coded_message[:-padding]
+    # Создаем таблицу для обратного поиска (битовая строка -> символ)
     reverse_codes = {v: k for k, v in huffman_codes.items()}
-    current_code = ""
-    decoded_data = bytearray()
-    for bit in coded_message:
-        current_code += bit
-        if current_code in reverse_codes:
-            decoded_data.append(reverse_codes[current_code])
-            current_code = ""
+
+    # Декодируем битовую строку
+    current_bits = ""
+    decoded_data = []
+    for bit in encoded_bits:
+        current_bits += bit
+        if current_bits in reverse_codes:
+            decoded_data.append(reverse_codes[current_bits])
+            current_bits = ""
+
     return bytes(decoded_data)
 
-
-def read_huffman_codes(codes_file):
-    huffman_codes = {}
-    with open(codes_file, 'r') as f:
-        for line in f:
-            symbol, code = line.strip().split(':')
-            huffman_codes[int(symbol)] = code
-    return huffman_codes
-
-
-def write_huffman_codes(huffman_codes, file_path):
-    with open(file_path, 'w') as code_file:
-        for symbol, code in huffman_codes.items():
-            code_file.write(f"{symbol}:{code}\n")
-
-
-# Новые функции для интеграции с вашим примером использования
 def compress_file(input_path: str, output_path: str):
     """Сжимает файл с использованием BWT+MTF+HA"""
     with open(input_path, "rb") as f:
@@ -194,34 +157,25 @@ def compress_file(input_path: str, output_path: str):
     mtf_data = mtf_transform(transformed_data)
 
     # Применяем Хаффман
-    compressed_bytes, huffman_codes = huffman_compress(mtf_data)
+    compressed_bytes = huffman_compress(mtf_data)
 
     # Сохраняем сжатые данные и дополнительную информацию
     with open(output_path, "wb") as f:
         # Записываем индекс BWT (4 байта)
         f.write(index.to_bytes(4, byteorder='big'))
-        # Записываем коды Хаффмана
-        codes_bytes = serialize_huffman_codes(huffman_codes)
-        f.write(len(codes_bytes).to_bytes(4, byteorder='big'))
-        f.write(codes_bytes)
         # Записываем сжатые данные
         f.write(compressed_bytes)
-
 
 def decompress_file(input_path: str, output_path: str):
     """Распаковывает файл, сжатый с помощью BWT+MTF+HA"""
     with open(input_path, "rb") as f:
         # Читаем индекс BWT
         index = int.from_bytes(f.read(4), byteorder='big')
-        # Читаем коды Хаффмана
-        codes_length = int.from_bytes(f.read(4), byteorder='big')
-        codes_bytes = f.read(codes_length)
-        huffman_codes = deserialize_huffman_codes(codes_bytes)
         # Читаем сжатые данные
         compressed_data = f.read()
 
     # Декодируем Хаффман
-    decoded_mtf_data = huffman_decompress(compressed_data, huffman_codes)
+    decoded_mtf_data = huffman_decompress(compressed_data)
 
     # Декодируем MTF
     decoded_transformed_data = mtf_inverse(decoded_mtf_data)
