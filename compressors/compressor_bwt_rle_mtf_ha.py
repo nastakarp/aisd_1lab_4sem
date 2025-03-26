@@ -1,431 +1,345 @@
-import os
-import time
+import numpy as np
 import heapq
-import pickle
-from collections import Counter
-import logging
+import time
+import math
+import os
+from collections import defaultdict
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Размер блока (200 КБ)
+BLOCK_SIZE = 200 * 1024
 
-
-class Node:
-    def __init__(self, symbol=None, counter=None, left=None, right=None):
-        self.symbol = symbol
-        self.counter = counter
+# Класс для узлов дерева Хаффмана
+class HuffmanNode:
+    def __init__(self, char=None, freq=0, left=None, right=None):
+        self.char = char
+        self.freq = freq
         self.left = left
         self.right = right
 
     def __lt__(self, other):
-        return self.counter < other.counter
+        return self.freq < other.freq
 
+# Функции для BWT
+def bwt_transform(data: bytes, chunk_size: int = 1024) -> tuple[bytes, list[int]]:
+    transformed_data = bytearray()
+    indices = []
+    for start in range(0, len(data), chunk_size):
+        chunk = data[start:start + chunk_size]
+        index, encoded_chunk = transform_chunk(chunk)
+        transformed_data.extend(encoded_chunk)
+        indices.append(index)
+    return bytes(transformed_data), indices
 
-def build_suffix_array(data: bytes) -> list[int]:
-    """Строит суффиксный массив с использованием алгоритма Manber-Myers."""
-    n = len(data)
-    sa = list(range(n))
-    rank = [data[i] for i in range(n)]
-    k = 1
+def transform_chunk(chunk: bytes) -> tuple[int, bytes]:
+    rotations = [chunk[i:] + chunk[:i] for i in range(len(chunk))]
+    rotations.sort()
+    original_index = rotations.index(chunk)
+    encoded_chunk = bytes(rotation[-1] for rotation in rotations)
+    return original_index, encoded_chunk
 
-    while k < n:
-        # Сортируем суффиксы по текущему и следующему символу
-        sa.sort(key=lambda i: (rank[i], rank[i + k]) if i + k < n else (rank[i],))
+def bwt_inverse(transformed_data: bytes, indices: list[int], chunk_size: int = 1024) -> bytes:
+    restored_data = bytearray()
+    position = 0
+    index = 0
+    while position < len(transformed_data):
+        end = position + chunk_size if position + chunk_size <= len(transformed_data) else len(transformed_data)
+        chunk = transformed_data[position:end]
+        original_index = indices[index]
+        restored_chunk = reverse_transform_chunk(original_index, chunk)
+        restored_data.extend(restored_chunk)
+        position = end
+        index += 1
+    return bytes(restored_data)
 
-        new_rank = [0] * n
-        new_rank[sa[0]] = 0
-        for i in range(1, n):
-            # Сравниваем текущий и предыдущий суффиксы
-            curr = sa[i]
-            prev = sa[i - 1]
-            same_as_prev = (rank[curr] == rank[prev] and
-                            ((curr + k < n and prev + k < n and rank[curr + k] == rank[prev + k]) or
-                             (curr + k >= n and prev + k >= n)))
+def reverse_transform_chunk(original_index: int, encoded_chunk: bytes) -> bytes:
+    table = [(char, idx) for idx, char in enumerate(encoded_chunk)]
+    table.sort()
+    result = bytearray()
+    current_row = original_index
+    for _ in range(len(encoded_chunk)):
+        char, current_row = table[current_row]
+        result.append(char)
+    return bytes(result)
 
-            new_rank[curr] = new_rank[prev] + (0 if same_as_prev else 1)
-        rank = new_rank
+# Функции для MTF
+def mtf_transform(data: bytes) -> bytes:
+    alphabet = list(range(256))
+    transformed_data = bytearray()
+    for byte in data:
+        index = alphabet.index(byte)
+        transformed_data.append(index)
+        alphabet.pop(index)
+        alphabet.insert(0, byte)
+    return bytes(transformed_data)
 
-        if rank[sa[-1]] == n - 1:
-            break
-        k *= 2
-    return sa
+def mtf_inverse(transformed_data: bytes) -> bytes:
+    alphabet = list(range(256))
+    original_data = bytearray()
+    for index in transformed_data:
+        byte = alphabet[index]
+        original_data.append(byte)
+        alphabet.pop(index)
+        alphabet.insert(0, byte)
+    return bytes(original_data)
 
-
-def bwt_transform(data: bytes) -> tuple[bytes, int]:
-    """Применяет преобразование Барроуза-Уилера к данным."""
-    if not data:
-        return b'', 0
-
-    n = len(data)
-    sa = build_suffix_array(data)
-
-    # Создаем преобразованные данные
-    transformed = bytearray()
-    for i in range(n):
-        transformed.append(data[(sa[i] + n - 1) % n])
-
-    index = sa.index(0)
-    return bytes(transformed), index
-
-
-def bwt_inverse(transformed: bytes, index: int) -> bytes:
-    """Обратное преобразование Барроуза-Уилера."""
-    if not transformed:
-        return b''
-
-    n = len(transformed)
-
-    # Подсчет частот символов
-    freq = [0] * 256
-    for byte in transformed:
-        freq[byte] += 1
-
-    # Вычисление стартовых позиций
-    start = [0] * 256
-    for i in range(1, 256):
-        start[i] = start[i - 1] + freq[i - 1]
-
-    # Построение LF-маппинга
-    lf = [0] * n
-    count = [0] * 256
-    for i in range(n):
-        byte = transformed[i]
-        lf[i] = start[byte] + count[byte]
-        count[byte] += 1
-
-    # Восстановление оригинальных данных
-    original = bytearray()
-    i = index
-    for _ in range(n):
-        original.append(transformed[i])
-        i = lf[i]
-
-    return bytes(original[::-1])
-
-
+# Функции для RLE с битовыми флагами
 def rle_compress(data: bytes) -> bytes:
-    """RLE сжатие с обработкой длинных последовательностей."""
     compressed = bytearray()
-    n = len(data)
     i = 0
-
+    n = len(data)
     while i < n:
         current = data[i]
         count = 1
-        max_count = min(255, n - i)
-
-        while count < max_count and data[i + count] == current:
+        while i + count < n and count < 127 and data[i + count] == current:
             count += 1
-
-        compressed.append(count)
-        compressed.append(current)
-        i += count
-
+        if count > 1:
+            compressed.append(0x80 | count)
+            compressed.append(current)
+            i += count
+        else:
+            seq = bytearray()
+            seq.append(current)
+            i += 1
+            while i < n and len(seq) < 127 and (i >= n - 1 or data[i] != data[i + 1]):
+                seq.append(data[i])
+                i += 1
+            compressed.append(len(seq))
+            compressed.extend(seq)
     return bytes(compressed)
 
-
-def rle_decompress(compressed: bytes) -> bytes:
-    """RLE распаковка."""
+def rle_decompress(compressed_data: bytes) -> bytes:
     decompressed = bytearray()
-    n = len(compressed)
-
-    for i in range(0, n, 2):
-        if i + 1 >= n:
-            break
-        count = compressed[i]
-        byte = compressed[i + 1]
-        decompressed.extend([byte] * count)
-
+    i = 0
+    n = len(compressed_data)
+    while i < n:
+        header = compressed_data[i]
+        i += 1
+        if header & 0x80:
+            count = header & 0x7F
+            if i >= n:
+                raise ValueError("Invalid RLE data")
+            byte = compressed_data[i]
+            i += 1
+            decompressed.extend([byte] * count)
+        else:
+            length = header
+            if i + length > n:
+                raise ValueError("Invalid RLE data")
+            decompressed.extend(compressed_data[i:i + length])
+            i += length
     return bytes(decompressed)
 
-
-def mtf_transform(data: bytes) -> bytes:
-    """Move-To-Front преобразование."""
-    alphabet = list(range(256))
-    transformed = bytearray()
-
-    for byte in data:
-        index = alphabet.index(byte)
-        transformed.append(index)
-        # Перемещаем символ в начало
-        alphabet.pop(index)
-        alphabet.insert(0, byte)
-
-    return bytes(transformed)
-
-
-def mtf_inverse(transformed: bytes) -> bytes:
-    """Обратное Move-To-Front преобразование."""
-    alphabet = list(range(256))
-    original = bytearray()
-
-    for index in transformed:
-        byte = alphabet[index]
-        original.append(byte)
-        # Восстанавливаем алфавит
-        alphabet.pop(index)
-        alphabet.insert(0, byte)
-
-    return bytes(original)
-
-
-def build_huffman_tree(freq: dict) -> Node:
-    """Строит дерево Хаффмана."""
+# Функции для Хаффмана
+def build_huffman_tree(freq_dict):
     heap = []
-    for symbol, count in freq.items():
-        heapq.heappush(heap, Node(symbol=symbol, counter=count))
+    for char, freq in freq_dict.items():
+        heapq.heappush(heap, HuffmanNode(char=char, freq=freq))
 
     while len(heap) > 1:
         left = heapq.heappop(heap)
         right = heapq.heappop(heap)
-        parent = Node(counter=left.counter + right.counter, left=left, right=right)
-        heapq.heappush(heap, parent)
+        merged = HuffmanNode(freq=left.freq + right.freq, left=left, right=right)
+        heapq.heappush(heap, merged)
 
     return heapq.heappop(heap)
 
-
-def generate_huffman_codes(node: Node, code: str = "", codes: dict = None) -> dict:
-    """Генерирует коды Хаффмана."""
+def build_huffman_codes(node, current_code="", codes=None):
     if codes is None:
         codes = {}
-
-    if node.symbol is not None:
-        codes[node.symbol] = code
+    if node.char is not None:
+        codes[node.char] = current_code
     else:
-        generate_huffman_codes(node.left, code + "0", codes)
-        generate_huffman_codes(node.right, code + "1", codes)
-
+        build_huffman_codes(node.left, current_code + "0", codes)
+        build_huffman_codes(node.right, current_code + "1", codes)
     return codes
 
+def huffman_compress(data: bytes) -> tuple[bytes, dict]:
+    freq_dict = defaultdict(int)
+    for byte in data:
+        freq_dict[byte] += 1
 
-def huffman_compress(data: bytes) -> bytes:
-    """Huffman сжатие."""
-    if not data:
-        return b''
+    if len(freq_dict) == 0:
+        return bytes(), {}
 
-    # Подсчет частот
-    freq = Counter(data)
+    root = build_huffman_tree(freq_dict)
+    codes = build_huffman_codes(root)
 
-    # Построение дерева
-    tree = build_huffman_tree(freq)
+    encoded_bits = []
+    for byte in data:
+        encoded_bits.append(codes[byte])
 
-    # Генерация кодов
-    codes = generate_huffman_codes(tree)
+    bit_string = ''.join(encoded_bits)
+    padding = 8 - len(bit_string) % 8
+    bit_string += '0' * padding
 
-    # Кодирование данных
-    encoded_bits = ''.join([codes[byte] for byte in data])
+    compressed = bytearray()
+    compressed.append(padding)
 
-    # Добавление padding
-    padding = (8 - len(encoded_bits) % 8) % 8
-    encoded_bits += '0' * padding
+    for i in range(0, len(bit_string), 8):
+        byte = bit_string[i:i + 8]
+        compressed.append(int(byte, 2))
 
-    # Преобразование в байты
-    encoded_bytes = bytearray()
-    for i in range(0, len(encoded_bits), 8):
-        byte = encoded_bits[i:i + 8]
-        encoded_bytes.append(int(byte, 2))
+    return bytes(compressed), codes
 
-    # Подготовка метаданных
-    metadata = {
-        'codes': codes,
-        'padding': padding,
-        'freq': freq
-    }
-    metadata_bytes = pickle.dumps(metadata)
+def huffman_decompress(compressed_data: bytes, huffman_codes: dict) -> bytes:
+    if len(compressed_data) == 0:
+        return bytes()
 
-    # Формат: [4 байта - длина метаданных][метаданные][закодированные данные]
-    return len(metadata_bytes).to_bytes(4, 'big') + metadata_bytes + encoded_bytes
+    padding = compressed_data[0]
+    bit_string = ''.join(f"{byte:08b}" for byte in compressed_data[1:])
+    if padding > 0:
+        bit_string = bit_string[:-padding]
 
+    reverse_codes = {v: k for k, v in huffman_codes.items()}
+    current_code = ""
+    decompressed = bytearray()
 
-def huffman_decompress(compressed: bytes) -> bytes:
-    """Huffman распаковка."""
-    if not compressed:
-        return b''
+    for bit in bit_string:
+        current_code += bit
+        if current_code in reverse_codes:
+            decompressed.append(reverse_codes[current_code])
+            current_code = ""
 
-    # Извлечение метаданных
-    metadata_length = int.from_bytes(compressed[:4], 'big')
-    metadata = pickle.loads(compressed[4:4 + metadata_length])
-    encoded_data = compressed[4 + metadata_length:]
+    return bytes(decompressed)
 
-    # Восстановление дерева
-    tree = build_huffman_tree(metadata['freq'])
+def process_block(block: bytes) -> tuple[bytes, list[int], dict, float, float]:
+    # BWT
+    transformed_data, indices = bwt_transform(block)
 
-    # Преобразование байтов в биты
-    bits = []
-    for byte in encoded_data:
-        bits.append(f"{byte:08b}")
-    bits = ''.join(bits)
+    # MTF
+    transformed_data = mtf_transform(transformed_data)
 
-    # Удаление padding
-    if metadata['padding'] > 0:
-        bits = bits[:-metadata['padding']]
+    # RLE
+    transformed_data = rle_compress(transformed_data)
 
-    # Декодирование
-    current_node = tree
-    decoded = bytearray()
+    # Huffman
+    compressed_data, codes = huffman_compress(transformed_data)
 
-    for bit in bits:
-        if bit == '0':
-            current_node = current_node.left
-        else:
-            current_node = current_node.right
+    return compressed_data, indices, codes
 
-        if current_node.symbol is not None:
-            decoded.append(current_node.symbol)
-            current_node = tree
+def serialize_huffman_codes(codes):
+    serialized = bytearray()
+    for char, code in codes.items():
+        serialized.extend([char, len(code)])
+        code_bytes = int(code, 2).to_bytes((len(code) + 7) // 8, 'big')
+        serialized.append(len(code_bytes))
+        serialized.extend(code_bytes)
+    return bytes(serialized)
 
-    return bytes(decoded)
+def deserialize_huffman_codes(code_bytes):
+    codes = {}
+    i = 0
+    while i < len(code_bytes):
+        char = code_bytes[i]
+        code_len = code_bytes[i + 1]
+        bytes_len = code_bytes[i + 2]
+        i += 3
 
+        code_int = int.from_bytes(code_bytes[i:i + bytes_len], 'big')
+        code = bin(code_int)[2:].zfill(code_len)
+        codes[char] = code
+        i += bytes_len
+    return codes
 
-class BWT_RLE_MTF_Huffman:
-    @staticmethod
-    def compress(data: bytes, chunk_size: int = 1024 * 1024) -> bytes:
-        """Сжатие с чанкованием."""
-        if not data:
-            return b''
+def compress_file(file_path, output_compressed):
+    start_time = time.time()
 
-        compressed_chunks = []
-        total_size = len(data)
-        processed = 0
+    with open(file_path, "rb") as f:
+        data = f.read()
+    original_size = len(data)
+    print(f"Обработка файла {file_path}...")
+    print(f"Исходный размер данных: {original_size} байт")
 
-        print("Compressing...")
-        while processed < total_size:
-            chunk = data[processed:processed + chunk_size]
-            processed += len(chunk)
+    total_entropy = 0.0
+    total_avg_code_length = 0.0
+    block_count = 0
 
-            # BWT
-            bwt_data, index = bwt_transform(chunk)
-
-            # RLE
-            rle_data = rle_compress(bwt_data)
-
-            # MTF
-            mtf_data = mtf_transform(rle_data)
-
-            # Huffman
-            huffman_data = huffman_compress(mtf_data)
-
-            # Сохраняем индекс BWT и сжатые данные
-            compressed_chunk = index.to_bytes(4, 'big') + huffman_data
-            compressed_chunks.append(compressed_chunk)
-
-            print(f"Processed {processed}/{total_size} bytes ({processed / total_size:.1%})")
-
-        # Объединяем все чанки
-        return len(compressed_chunks).to_bytes(4, 'big') + b''.join(compressed_chunks)
-
-    @staticmethod
-    def decompress(compressed: bytes) -> bytes:
-        """Распаковка с чанкованием."""
-        if not compressed:
-            return b''
-
-        # Извлекаем количество чанков
-        num_chunks = int.from_bytes(compressed[:4], 'big')
-        offset = 4
-        decompressed_chunks = []
-
-        print("Decompressing...")
-        for chunk_num in range(num_chunks):
-            # Извлекаем индекс BWT
-            index = int.from_bytes(compressed[offset:offset + 4], 'big')
-            offset += 4
-
-            # Находим конец Huffman данных
-            if chunk_num < num_chunks - 1:
-                next_chunk_offset = offset + int.from_bytes(compressed[offset:offset + 4], 'big')
-                huffman_data = compressed[offset:next_chunk_offset]
-                offset = next_chunk_offset
-            else:
-                huffman_data = compressed[offset:]
-
-            # Huffman
-            mtf_data = huffman_decompress(huffman_data)
-
-            # MTF
-            rle_data = mtf_inverse(mtf_data)
-
-            # RLE
-            bwt_data = rle_decompress(rle_data)
-
-            # BWT
-            chunk_data = bwt_inverse(bwt_data, index)
-
-            decompressed_chunks.append(chunk_data)
-            print(f"Decompressed chunk {chunk_num + 1}/{num_chunks}")
-
-        return b''.join(decompressed_chunks)
-
-
-def process_file(input_path: str, compressed_path: str, decompressed_path: str):
-    """Обрабатывает файл полностью."""
-    try:
-        # Чтение исходного файла
-        logger.info(f"Reading file: {input_path}")
-        with open(input_path, 'rb') as f:
-            original_data = f.read()
-        original_size = len(original_data)
-        logger.info(f"Original size: {original_size} bytes")
-
-        # Сжатие
-        logger.info("Compressing...")
-        start_time = time.time()
-        compressed_data = BWT_RLE_MTF_Huffman.compress(original_data)
-        compression_time = time.time() - start_time
-
-        compressed_size = len(compressed_data)
-        logger.info(f"Compressed size: {compressed_size} bytes")
-        logger.info(f"Compression ratio: {compressed_size / original_size:.2f}")
-        logger.info(f"Compression time: {compression_time:.2f} sec")
-
-        # Сохранение сжатых данных
-        with open(compressed_path, 'wb') as f:
-            f.write(compressed_data)
-        logger.info(f"Compressed data saved to: {compressed_path}")
-
-        # Распаковка
-        logger.info("Decompressing...")
-        start_time = time.time()
-        decompressed_data = BWT_RLE_MTF_Huffman.decompress(compressed_data)
-        decompression_time = time.time() - start_time
-        logger.info(f"Decompression time: {decompression_time:.2f} sec")
-
-        # Проверка целостности
-        if original_data == decompressed_data:
-            logger.info("Data integrity check: SUCCESS")
-        else:
-            logger.error("Data integrity check: FAILED")
-            # Находим первое несовпадение
-            min_len = min(len(original_data), len(decompressed_data))
-            for i in range(min_len):
-                if original_data[i] != decompressed_data[i]:
-                    logger.error(f"First mismatch at position {i}: "
-                                 f"original={original_data[i]}, decompressed={decompressed_data[i]}")
+    with open(output_compressed, "wb") as compressed_file:
+        with open(file_path, "rb") as f:
+            block_number = 0
+            while True:
+                block = f.read(BLOCK_SIZE)
+                if not block:
                     break
-            if len(original_data) != len(decompressed_data):
-                logger.error(f"Length mismatch: original={len(original_data)}, "
-                             f"decompressed={len(decompressed_data)}")
-            return
 
-        # Сохранение распакованных данных
-        with open(decompressed_path, 'wb') as f:
-            f.write(decompressed_data)
-        logger.info(f"Decompressed data saved to: {decompressed_path}")
+                compressed_block, indices, codes = process_block(block)
+                block_count += 1
 
-    except Exception as e:
-        logger.error(f"Error processing file: {e}", exc_info=True)
-        raise
+                compressed_file.write(block_number.to_bytes(4, 'big'))
+                compressed_file.write(len(indices).to_bytes(4, 'big'))
+                for index in indices:
+                    compressed_file.write(index.to_bytes(4, 'big'))
 
+                code_bytes = serialize_huffman_codes(codes)
+                compressed_file.write(len(code_bytes).to_bytes(4, 'big'))
+                compressed_file.write(code_bytes)
 
-if __name__ == "__main__":
-    # Пути к файлам
-    input_file = "C:/OPP/compression_project/tests/test1_enwik7"
-    compressed_file = "C:/OPP/compression_project/results/compressed/test1/c_enwik7_BWT_RLE_MTF_Ha.bin"
-    decompressed_file = "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_BWT_RLE_MTF_Ha.txt"
+                compressed_file.write(len(compressed_block).to_bytes(4, 'big'))
+                compressed_file.write(compressed_block)
+                block_number += 1
 
-    # Создаем директории, если их нет
-    os.makedirs(os.path.dirname(compressed_file), exist_ok=True)
-    os.makedirs(os.path.dirname(decompressed_file), exist_ok=True)
+    compressed_size = os.path.getsize(output_compressed)
+    print(f"Размер сжатых данных: {compressed_size} байт")
 
-    # Обработка файла
-    process_file(input_file, compressed_file, decompressed_file)
+    compression_ratio = original_size / compressed_size if compressed_size > 0 else 0
+    print(f"Коэффициент сжатия: {compression_ratio:.2f}")
+
+    end_time = time.time()
+    print(f"Время выполнения: {end_time - start_time:.2f} секунд")
+
+def decompress_file(input_compressed, output_decompressed):
+    start_time = time.time()
+
+    with open(input_compressed, "rb") as f:
+        blocks = {}
+        while True:
+            block_number_bytes = f.read(4)
+            if not block_number_bytes:
+                break
+
+            block_number = int.from_bytes(block_number_bytes, 'big')
+            num_indices = int.from_bytes(f.read(4), 'big')
+            indices = [int.from_bytes(f.read(4), 'big') for _ in range(num_indices)]
+
+            code_size = int.from_bytes(f.read(4), 'big')
+            code_bytes = f.read(code_size)
+            codes = deserialize_huffman_codes(code_bytes)
+
+            block_size = int.from_bytes(f.read(4), 'big')
+            compressed_block = f.read(block_size)
+
+            # Huffman декомпрессия
+            decompressed_transformed = huffman_decompress(compressed_block, codes)
+
+            # RLE декомпрессия
+            decompressed_transformed = rle_decompress(decompressed_transformed)
+
+            # MTF декомпрессия
+            decompressed_transformed = mtf_inverse(decompressed_transformed)
+
+            # BWT декомпрессия
+            decompressed_data = bwt_inverse(decompressed_transformed, indices)
+            blocks[block_number] = decompressed_data
+
+    with open(output_decompressed, "wb") as decompressed_file:
+        for block_number in sorted(blocks.keys()):
+            decompressed_file.write(blocks[block_number])
+
+    decompressed_size = os.path.getsize(output_decompressed)
+    print(f"Размер после декомпрессии: {decompressed_size} байт\n")
+
+# Список файлов для обработки
+file_paths = [
+    "C:/OPP/compression_project/tests/test1_enwik7"
+]
+
+# Обработка каждого файла
+for i, file_path in enumerate(file_paths):
+    output_compressed = f"C:/OPP/compression_project/results/compressed/test1/c_enwik7_BWT_RLE_MTF_Ha.bin"
+    output_decompressed = f"C:/OPP/compression_project/results/decompressors/test1/d_enwik7_BWT_RLE_MTF_Ha.txt"
+
+    # Сжатие
+    compress_file(file_path, output_compressed)
+
+    # Распаковка
+    decompress_file(output_compressed, output_decompressed)
