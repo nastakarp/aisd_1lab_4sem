@@ -1,37 +1,20 @@
-#mtf
-def mtf_encode(data: bytes) -> bytes:
-    """
-    Кодирование Move-to-Front.
-    :param data: Входные данные (байтовая строка).
-    :return: Закодированные данные (байтовая строка).
-    """
-    dictionary = list(range(256))  # Инициализация словаря (0-255)
-    encoded_data = []
-
+def mtf_transform(data: bytes) -> bytes:
+    alphabet = list(range(256))
+    transformed_data = bytearray()
     for byte in data:
-        index = dictionary.index(byte)
-        encoded_data.append(index)
-        # Перемещаем символ в начало словаря
-        dictionary.pop(index)
-        dictionary.insert(0, byte)
-
-    return bytes(encoded_data)
+        index = alphabet.index(byte)
+        transformed_data.append(index)
+        alphabet.pop(index)
+        alphabet.insert(0, byte)
+    return bytes(transformed_data)
 
 
-def mtf_decode(encoded_data: bytes) -> bytes:
-    """
-    Декодирование Move-to-Front.
-    :param encoded_data: Закодированные данные (байтовая строка).
-    :return: Восстановленные данные (байтовая строка).
-    """
-    dictionary = list(range(256))  # Инициализация словаря (0-255)
-    decoded_data = []
-
-    for index in encoded_data:
-        byte = dictionary[index]
-        decoded_data.append(byte)
-        # Перемещаем символ в начало словаря
-        dictionary.pop(index)
-        dictionary.insert(0, byte)
-
-    return bytes(decoded_data)
+def mtf_inverse(transformed_data: bytes) -> bytes:
+    alphabet = list(range(256))
+    original_data = bytearray()
+    for index in transformed_data:
+        byte = alphabet[index]
+        original_data.append(byte)
+        alphabet.pop(index)
+        alphabet.insert(0, byte)
+    return bytes(original_data)
