@@ -217,7 +217,7 @@ def huffman_decompress(compressed_data: bytes, huffman_codes: dict) -> bytes:
     return bytes(decompressed)
 
 
-def process_block(block: bytes) -> tuple[bytes, list[int], dict, float, float]:
+def process_block(block: bytes) -> tuple[bytes, list[int], dict]:
     # BWT
     transformed_data, indices = bwt_transform(block)
 
@@ -268,10 +268,6 @@ def compress_file(file_path, output_compressed):
     print(f"Обработка файла {file_path}...")
     print(f"Исходный размер данных: {original_size} байт")
 
-    total_entropy = 0.0
-    total_avg_code_length = 0.0
-    block_count = 0
-
     with open(output_compressed, "wb") as compressed_file:
         with open(file_path, "rb") as f:
             block_number = 0
@@ -281,7 +277,6 @@ def compress_file(file_path, output_compressed):
                     break
 
                 compressed_block, indices, codes = process_block(block)
-                block_count += 1
 
                 compressed_file.write(block_number.to_bytes(4, 'big'))
                 compressed_file.write(len(indices).to_bytes(4, 'big'))
@@ -363,7 +358,6 @@ def compare_files(original_path, decompressed_path):
         else:
             print("× Ошибка: файлы различаются (декомпрессия выполнена некорректно)!")
 
-            # Найдем позиции, где файлы различаются
             min_len = min(len(content1), len(content2))
             diff_positions = [i for i in range(min_len) if content1[i] != content2[i]]
 
@@ -401,29 +395,79 @@ def compare_files_with_hash(original_path, decompressed_path):
         return False
 
 
-# Список файлов для обработки
-file_paths = [
-    "C:/OPP/compression_project/tests/test1_enwik7"
-]
-
-# Обработка каждого файла
-for i, file_path in enumerate(file_paths):
-    output_compressed = f"C:/OPP/compression_project/results/compressed/test1/c_enwik7_BWT_RLE_MTF_Ha.bin"
-    output_decompressed = f"C:/OPP/compression_project/results/decompressors/test1/d_enwik7_BWT_RLE_MTF_Ha.txt"
-
+def process_test_case(input_path, compressed_path, decompressed_path, test_name):
     print("=" * 70)
-    print(f"Обработка файла {i + 1}/{len(file_paths)}: {file_path}")
+    print(f"Обработка теста: {test_name}")
     print("=" * 70)
+
+    # Создаем директории, если они не существуют
+    os.makedirs(os.path.dirname(compressed_path), exist_ok=True)
+    os.makedirs(os.path.dirname(decompressed_path), exist_ok=True)
 
     # Сжатие
     print("\n[Этап сжатия]")
-    compress_file(file_path, output_compressed)
+    compress_file(input_path, compressed_path)
 
     # Распаковка
     print("\n[Этап декомпрессии]")
-    decompress_file(output_compressed, output_decompressed)
+    decompress_file(compressed_path, decompressed_path)
 
     # Проверки
-    compare_files(file_path, output_decompressed)
-    compare_files_with_hash(file_path, output_decompressed)
+    compare_files(input_path, decompressed_path)
+    compare_files_with_hash(input_path, decompressed_path)
     print("=" * 70 + "\n")
+
+
+# Основная функция
+def main():
+    # Тест 1: enwik7 (английский текст)
+    process_test_case(
+        "C:/OPP/compression_project/tests/test1_enwik7",
+        "C:/OPP/compression_project/results/compressed/test1/c_enwik7_ha.bin",
+        "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_ha.txt",
+        "enwik7 (английский текст)"
+    )
+
+    # Тест 2: Русский текст
+    process_test_case(
+        "C:/OPP/compression_project/tests/test2_rus.txt",
+        "C:/OPP/compression_project/results/compressed/test2/rus_ha.bin",
+        "C:/OPP/compression_project/results/decompressors/test2/rus_ha.txt",
+        "Русский текст"
+    )
+
+    # Тест 3: Бинарный файл
+    process_test_case(
+        "C:/OPP/compression_project/tests/test3_bin.exe",
+        "C:/OPP/compression_project/results/compressed/test3/binary_file_compressed.bin",
+        "C:/OPP/compression_project/results/decompressors/test3/binary_file_decompressed.bin",
+        "Бинарный файл (EXE)"
+    )
+
+    # Тест 4: Черно-белое изображение
+    process_test_case(
+        "C:/OPP/compression_project/tests/black_white_image.raw",
+        "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin",
+        "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw",
+        "Черно-белое изображение (RAW)"
+    )
+
+    # Тест 5: Градации серого
+    process_test_case(
+        "C:/OPP/compression_project/tests/gray_image.raw",
+        "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin",
+        "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw",
+        "Изображение в градациях серого (RAW)"
+    )
+
+    # Тест 6: Цветное изображение
+    process_test_case(
+        "C:/OPP/compression_project/tests/color_image.raw",
+        "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin",
+        "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw",
+        "Цветное изображение (RAW)"
+    )
+
+
+if __name__ == "__main__":
+    main()
