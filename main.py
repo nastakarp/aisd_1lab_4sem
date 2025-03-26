@@ -6,7 +6,7 @@ from algorithms.rle import rle_encode, rle_decode
 from algorithms.lz77 import lz77_encode, lz77_decode
 from algorithms.lz78 import LZ78Encoder, LZ78Decoder
 from utils.entropy_calculator import calculate_entropy
-from utils.plotter import plot_compression_ratios, plot_entropy_vs_block_size, plot_compression_ratio_vs_buffer_size, plot_compression_ratios_comparison
+from utils.plotter_lz77 import plot_compression_ratios, plot_entropy_vs_block_size, plot_compression_ratio_vs_buffer_size, plot_compression_ratios_comparison
 from tabulate import tabulate
 # Таблица для хранения данных о компрессии
 compression_data = []
