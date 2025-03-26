@@ -4,9 +4,11 @@ import time
 import math
 import os
 from collections import defaultdict
+import hashlib
 
 # Размер блока (200 КБ)
 BLOCK_SIZE = 200 * 1024
+
 
 # Класс для узлов дерева Хаффмана
 class HuffmanNode:
@@ -19,6 +21,7 @@ class HuffmanNode:
     def __lt__(self, other):
         return self.freq < other.freq
 
+
 # Функции для BWT
 def bwt_transform(data: bytes, chunk_size: int = 1024) -> tuple[bytes, list[int]]:
     transformed_data = bytearray()
@@ -30,12 +33,14 @@ def bwt_transform(data: bytes, chunk_size: int = 1024) -> tuple[bytes, list[int]
         indices.append(index)
     return bytes(transformed_data), indices
 
+
 def transform_chunk(chunk: bytes) -> tuple[int, bytes]:
     rotations = [chunk[i:] + chunk[:i] for i in range(len(chunk))]
     rotations.sort()
     original_index = rotations.index(chunk)
     encoded_chunk = bytes(rotation[-1] for rotation in rotations)
     return original_index, encoded_chunk
+
 
 def bwt_inverse(transformed_data: bytes, indices: list[int], chunk_size: int = 1024) -> bytes:
     restored_data = bytearray()
@@ -51,6 +56,7 @@ def bwt_inverse(transformed_data: bytes, indices: list[int], chunk_size: int = 1
         index += 1
     return bytes(restored_data)
 
+
 def reverse_transform_chunk(original_index: int, encoded_chunk: bytes) -> bytes:
     table = [(char, idx) for idx, char in enumerate(encoded_chunk)]
     table.sort()
@@ -60,6 +66,7 @@ def reverse_transform_chunk(original_index: int, encoded_chunk: bytes) -> bytes:
         char, current_row = table[current_row]
         result.append(char)
     return bytes(result)
+
 
 # Функции для MTF
 def mtf_transform(data: bytes) -> bytes:
@@ -72,6 +79,7 @@ def mtf_transform(data: bytes) -> bytes:
         alphabet.insert(0, byte)
     return bytes(transformed_data)
 
+
 def mtf_inverse(transformed_data: bytes) -> bytes:
     alphabet = list(range(256))
     original_data = bytearray()
@@ -81,6 +89,7 @@ def mtf_inverse(transformed_data: bytes) -> bytes:
         alphabet.pop(index)
         alphabet.insert(0, byte)
     return bytes(original_data)
+
 
 # Функции для RLE с битовыми флагами
 def rle_compress(data: bytes) -> bytes:
@@ -107,6 +116,7 @@ def rle_compress(data: bytes) -> bytes:
             compressed.extend(seq)
     return bytes(compressed)
 
+
 def rle_decompress(compressed_data: bytes) -> bytes:
     decompressed = bytearray()
     i = 0
@@ -129,6 +139,7 @@ def rle_decompress(compressed_data: bytes) -> bytes:
             i += length
     return bytes(decompressed)
 
+
 # Функции для Хаффмана
 def build_huffman_tree(freq_dict):
     heap = []
@@ -143,6 +154,7 @@ def build_huffman_tree(freq_dict):
 
     return heapq.heappop(heap)
 
+
 def build_huffman_codes(node, current_code="", codes=None):
     if codes is None:
         codes = {}
@@ -152,6 +164,7 @@ def build_huffman_codes(node, current_code="", codes=None):
         build_huffman_codes(node.left, current_code + "0", codes)
         build_huffman_codes(node.right, current_code + "1", codes)
     return codes
+
 
 def huffman_compress(data: bytes) -> tuple[bytes, dict]:
     freq_dict = defaultdict(int)
@@ -181,6 +194,7 @@ def huffman_compress(data: bytes) -> tuple[bytes, dict]:
 
     return bytes(compressed), codes
 
+
 def huffman_decompress(compressed_data: bytes, huffman_codes: dict) -> bytes:
     if len(compressed_data) == 0:
         return bytes()
@@ -202,6 +216,7 @@ def huffman_decompress(compressed_data: bytes, huffman_codes: dict) -> bytes:
 
     return bytes(decompressed)
 
+
 def process_block(block: bytes) -> tuple[bytes, list[int], dict, float, float]:
     # BWT
     transformed_data, indices = bwt_transform(block)
@@ -217,6 +232,7 @@ def process_block(block: bytes) -> tuple[bytes, list[int], dict, float, float]:
 
     return compressed_data, indices, codes
 
+
 def serialize_huffman_codes(codes):
     serialized = bytearray()
     for char, code in codes.items():
@@ -225,6 +241,7 @@ def serialize_huffman_codes(codes):
         serialized.append(len(code_bytes))
         serialized.extend(code_bytes)
     return bytes(serialized)
+
 
 def deserialize_huffman_codes(code_bytes):
     codes = {}
@@ -240,6 +257,7 @@ def deserialize_huffman_codes(code_bytes):
         codes[char] = code
         i += bytes_len
     return codes
+
 
 def compress_file(file_path, output_compressed):
     start_time = time.time()
@@ -287,6 +305,7 @@ def compress_file(file_path, output_compressed):
     end_time = time.time()
     print(f"Время выполнения: {end_time - start_time:.2f} секунд")
 
+
 def decompress_file(input_compressed, output_decompressed):
     start_time = time.time()
 
@@ -326,7 +345,61 @@ def decompress_file(input_compressed, output_decompressed):
             decompressed_file.write(blocks[block_number])
 
     decompressed_size = os.path.getsize(output_decompressed)
-    print(f"Размер после декомпрессии: {decompressed_size} байт\n")
+    print(f"Размер после декомпрессии: {decompressed_size} байт")
+
+    end_time = time.time()
+    print(f"Время декомпрессии: {end_time - start_time:.2f} секунд")
+
+
+def compare_files(original_path, decompressed_path):
+    print("\nПроверка целостности данных...")
+    with open(original_path, 'rb') as f1, open(decompressed_path, 'rb') as f2:
+        content1 = f1.read()
+        content2 = f2.read()
+
+        if content1 == content2:
+            print("✓ Файлы идентичны (декомпрессия выполнена корректно)")
+            return True
+        else:
+            print("× Ошибка: файлы различаются (декомпрессия выполнена некорректно)!")
+
+            # Найдем позиции, где файлы различаются
+            min_len = min(len(content1), len(content2))
+            diff_positions = [i for i in range(min_len) if content1[i] != content2[i]]
+
+            if len(content1) != len(content2):
+                print(
+                    f"Размеры файлов различаются: оригинальный {len(content1)} байт, декомпрессированный {len(content2)} байт")
+
+            if diff_positions:
+                print(f"Первые 10 позиций с различиями: {diff_positions[:10]}")
+                print(f"Пример различий (позиция {diff_positions[0]}):")
+
+            return False
+
+
+def calculate_file_hash(file_path):
+    hasher = hashlib.sha256()
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(4096):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def compare_files_with_hash(original_path, decompressed_path):
+    print("\nПроверка контрольных сумм...")
+    original_hash = calculate_file_hash(original_path)
+    decompressed_hash = calculate_file_hash(decompressed_path)
+
+    if original_hash == decompressed_hash:
+        print(f"✓ Хеши совпадают (SHA-256): {original_hash}")
+        return True
+    else:
+        print(f"× Ошибка: хеши различаются!")
+        print(f"Оригинальный файл SHA-256: {original_hash}")
+        print(f"Декомпрессированный файл SHA-256: {decompressed_hash}")
+        return False
+
 
 # Список файлов для обработки
 file_paths = [
@@ -338,8 +411,19 @@ for i, file_path in enumerate(file_paths):
     output_compressed = f"C:/OPP/compression_project/results/compressed/test1/c_enwik7_BWT_RLE_MTF_Ha.bin"
     output_decompressed = f"C:/OPP/compression_project/results/decompressors/test1/d_enwik7_BWT_RLE_MTF_Ha.txt"
 
+    print("=" * 70)
+    print(f"Обработка файла {i + 1}/{len(file_paths)}: {file_path}")
+    print("=" * 70)
+
     # Сжатие
+    print("\n[Этап сжатия]")
     compress_file(file_path, output_compressed)
 
     # Распаковка
+    print("\n[Этап декомпрессии]")
     decompress_file(output_compressed, output_decompressed)
+
+    # Проверки
+    compare_files(file_path, output_decompressed)
+    compare_files_with_hash(file_path, output_decompressed)
+    print("=" * 70 + "\n")
