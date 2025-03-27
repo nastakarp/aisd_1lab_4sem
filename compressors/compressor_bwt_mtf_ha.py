@@ -7,60 +7,54 @@ import os
 BLOCK_SIZE = 64 * 1024
 
 
-# Функции для BWT (остаются без изменений)
-def build_suffix_array(data: bytes) -> list[int]:
-    n = len(data)
-    sa = list(range(n))
-    rank = [0] * n
-    for i in range(n):
-        rank[i] = data[i]
-    k = 1
-    while k < n:
-        sa.sort(key=lambda i: (rank[i], rank[i + k] if i + k < n else -1))
-        new_rank = [0] * n
-        new_rank[sa[0]] = 0
-        for i in range(1, n):
-            prev = sa[i - 1]
-            curr = sa[i]
-            equal = (rank[prev] == rank[curr] and
-                     (prev + k < n and curr + k < n and
-                      rank[prev + k] == rank[curr + k]))
-            new_rank[curr] = new_rank[prev] + (0 if equal else 1)
-        rank = new_rank
-        k *= 2
-    return sa
-
-
-def bwt_transform(data: bytes) -> tuple[bytes, int]:
-    n = len(data)
-    suffix_array = build_suffix_array(data)
+# Новые функции для BWT с обработкой по чанкам
+def bwt_transform(data: bytes, chunk_size: int = 1024) -> tuple[bytes, list[int]]:
+    """Применяет преобразование Барроуза-Уилера к данным по чанкам."""
     transformed_data = bytearray()
-    for i in range(n):
-        transformed_data.append(data[(suffix_array[i] + n - 1) % n])
-    index = suffix_array.index(0)
-    return bytes(transformed_data), index
+    indices = []
+    for start in range(0, len(data), chunk_size):
+        chunk = data[start:start + chunk_size]
+        index, encoded_chunk = transform_chunk(chunk)
+        transformed_data.extend(encoded_chunk)
+        indices.append(index)
+    return bytes(transformed_data), indices
 
 
-def bwt_inverse(transformed_data: bytes, index: int) -> bytes:
-    n = len(transformed_data)
-    freq = [0] * 256
-    for byte in transformed_data:
-        freq[byte] += 1
-    start = [0] * 256
-    for i in range(1, 256):
-        start[i] = start[i - 1] + freq[i - 1]
-    lf = [0] * n
-    count = [0] * 256
-    for i in range(n):
-        byte = transformed_data[i]
-        lf[i] = start[byte] + count[byte]
-        count[byte] += 1
-    original_data = bytearray()
-    i = index
-    for _ in range(n):
-        original_data.append(transformed_data[i])
-        i = lf[i]
-    return bytes(original_data[::-1])
+def transform_chunk(chunk: bytes) -> tuple[int, bytes]:
+    """Преобразует один чанк данных с помощью BWT."""
+    rotations = [chunk[i:] + chunk[:i] for i in range(len(chunk))]
+    rotations.sort()
+    original_index = rotations.index(chunk)
+    encoded_chunk = bytes(rotation[-1] for rotation in rotations)
+    return original_index, encoded_chunk
+
+
+def bwt_inverse(transformed_data: bytes, indices: list[int], chunk_size: int = 1024) -> bytes:
+    """Обратное преобразование Барроуза-Уилера для чанков."""
+    restored_data = bytearray()
+    position = 0
+    index = 0
+    while position < len(transformed_data):
+        end = position + chunk_size if position + chunk_size <= len(transformed_data) else len(transformed_data)
+        chunk = transformed_data[position:end]
+        original_index = indices[index]
+        restored_chunk = reverse_transform_chunk(original_index, chunk)
+        restored_data.extend(restored_chunk)
+        position = end
+        index += 1
+    return bytes(restored_data)
+
+
+def reverse_transform_chunk(original_index: int, encoded_chunk: bytes) -> bytes:
+    """Обратное преобразование для одного чанка."""
+    table = [(char, idx) for idx, char in enumerate(encoded_chunk)]
+    table.sort()
+    result = bytearray()
+    current_row = original_index
+    for _ in range(len(encoded_chunk)):
+        char, current_row = table[current_row]
+        result.append(char)
+    return bytes(result)
 
 
 # Функции для MTF (остаются без изменений)
@@ -100,7 +94,7 @@ def huffman_compress(data: bytes) -> bytes:
     padding = 8 - len(encoded_bits) % 8
     if padding != 8:  # Добавляем padding только если он нужен
         encoded_bits += "0" * padding
-    encoded_bytes = bytes([int(encoded_bits[i:i+8], 2) for i in range(0, len(encoded_bits), 8)])
+    encoded_bytes = bytes([int(encoded_bits[i:i + 8], 2) for i in range(0, len(encoded_bits), 8)])
 
     # Сохраняем таблицу кодов и padding в сжатых данных
     metadata = {
@@ -110,6 +104,7 @@ def huffman_compress(data: bytes) -> bytes:
     metadata_bytes = pickle.dumps(metadata)
     return len(metadata_bytes).to_bytes(4, "big") + metadata_bytes + encoded_bytes
 
+
 def huffman_decompress(encoded_data: bytes) -> bytes:
     """
     Декодирование Хаффмана с использованием таблицы кодов.
@@ -118,8 +113,8 @@ def huffman_decompress(encoded_data: bytes) -> bytes:
     """
     # Извлекаем длину метаданных
     metadata_length = int.from_bytes(encoded_data[:4], "big")
-    metadata_bytes = encoded_data[4:4+metadata_length]
-    encoded_bytes = encoded_data[4+metadata_length:]
+    metadata_bytes = encoded_data[4:4 + metadata_length]
+    encoded_bytes = encoded_data[4 + metadata_length:]
 
     # Восстанавливаем таблицу кодов и padding
     metadata = pickle.loads(metadata_bytes)
@@ -145,13 +140,14 @@ def huffman_decompress(encoded_data: bytes) -> bytes:
 
     return bytes(decoded_data)
 
+
 def compress_file(input_path: str, output_path: str):
     """Сжимает файл с использованием BWT+MTF+HA"""
     with open(input_path, "rb") as f:
         data = f.read()
 
-    # Применяем BWT
-    transformed_data, index = bwt_transform(data)
+    # Применяем BWT (новая версия с чанками)
+    transformed_data, indices = bwt_transform(data)
 
     # Применяем MTF
     mtf_data = mtf_transform(transformed_data)
@@ -161,16 +157,22 @@ def compress_file(input_path: str, output_path: str):
 
     # Сохраняем сжатые данные и дополнительную информацию
     with open(output_path, "wb") as f:
-        # Записываем индекс BWT (4 байта)
-        f.write(index.to_bytes(4, byteorder='big'))
+        # Записываем количество индексов (4 байта)
+        f.write(len(indices).to_bytes(4, byteorder='big'))
+        # Записываем все индексы
+        for index in indices:
+            f.write(index.to_bytes(4, byteorder='big'))
         # Записываем сжатые данные
         f.write(compressed_bytes)
+
 
 def decompress_file(input_path: str, output_path: str):
     """Распаковывает файл, сжатый с помощью BWT+MTF+HA"""
     with open(input_path, "rb") as f:
-        # Читаем индекс BWT
-        index = int.from_bytes(f.read(4), byteorder='big')
+        # Читаем количество индексов
+        num_indices = int.from_bytes(f.read(4), byteorder='big')
+        # Читаем все индексы
+        indices = [int.from_bytes(f.read(4), byteorder='big') for _ in range(num_indices)]
         # Читаем сжатые данные
         compressed_data = f.read()
 
@@ -180,38 +182,12 @@ def decompress_file(input_path: str, output_path: str):
     # Декодируем MTF
     decoded_transformed_data = mtf_inverse(decoded_mtf_data)
 
-    # Декодируем BWT
-    decompressed_data = bwt_inverse(decoded_transformed_data, index)
+    # Декодируем BWT (новая версия с чанками)
+    decompressed_data = bwt_inverse(decoded_transformed_data, indices)
 
     # Сохраняем распакованные данные
     with open(output_path, "wb") as f:
         f.write(decompressed_data)
-
-
-def serialize_huffman_codes(huffman_codes: dict) -> bytes:
-    """Сериализует коды Хаффмана в компактный бинарный формат"""
-    codes_bytes = bytearray()
-    for symbol, code in huffman_codes.items():
-        codes_bytes.extend([symbol, len(code)])
-        # Преобразуем строку кода в байты
-        code_byte = int(code, 2)
-        codes_bytes.append(code_byte)
-    return bytes(codes_bytes)
-
-
-def deserialize_huffman_codes(codes_bytes: bytes) -> dict:
-    """Десериализует коды Хаффмана из бинарного формата"""
-    huffman_codes = {}
-    i = 0
-    while i < len(codes_bytes):
-        symbol = codes_bytes[i]
-        code_length = codes_bytes[i + 1]
-        code_byte = codes_bytes[i + 2]
-        # Преобразуем байт обратно в строку битов
-        code = bin(code_byte)[2:].zfill(code_length)
-        huffman_codes[symbol] = code
-        i += 3
-    return huffman_codes
 
 
 def analyze_compression(original_path: str, compressed_path: str, decompressed_path: str):
@@ -239,7 +215,6 @@ def analyze_compression(original_path: str, compressed_path: str, decompressed_p
         print("Ошибка: данные после распаковки не совпадают с оригиналом")
 
 
-# Пример использования (адаптированный под ваш пример)
 if __name__ == "__main__":
     # Обработка файла enwik7
     input_data = "C:/OPP/compression_project/tests/test1_enwik7"
