@@ -43,8 +43,8 @@ def plot_all():
     plots = [
         {
             "data": {
-                "HA": 1.559, "RLE": 0.924, "BWT + RLE": 1.07,
-                "BWT + MTF + HA": 3.18, "BWT + MTF + RLE + HA": 1.67,
+                "HA": 1.559, "RLE": 0.924, "BWT + RLE": 0.80,
+                "BWT + MTF + HA": 1.90, "BWT + MTF + RLE + HA": 1.67,
                 "LZ77": 1.256, "LZ77 + HA": 1.273, "LZ78": 1.85, "LZ78 + HA": 2.02
             },
             "title": "enwik7",
@@ -53,8 +53,8 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 1.958, "RLE": 0.962, "BWT + RLE": 1.33,
-                "BWT + MTF + HA": 3.27, "BWT + MTF + RLE + HA": 2.59,
+                "HA": 1.958, "RLE": 0.962, "BWT + RLE": 1.10,
+                "BWT + MTF + HA": 2.42, "BWT + MTF + RLE + HA": 2.59,
                 "LZ77": 1.627, "LZ77 + HA": 1.498, "LZ78": 2.25, "LZ78 + HA": 2.38
             },
             "title": "русского текста",
@@ -63,8 +63,8 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 1.243, "RLE": 0.988, "BWT + RLE": 1.06,
-                "BWT + MTF + HA": 2.13, "BWT + MTF + RLE + HA": 1.53,
+                "HA": 1.243, "RLE": 0.988, "BWT + RLE": 0.85,
+                "BWT + MTF + HA": 1.62, "BWT + MTF + RLE + HA": 1.53,
                 "LZ77": 0.905, "LZ77 + HA": 1.123, "LZ78": 1.30, "LZ78 + HA": 1.47
             },
             "title": "бинарного файла",
@@ -73,8 +73,8 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 5.510, "RLE": 96.658, "BWT + RLE": 116.20,
-                "BWT + MTF + HA": 7.99, "BWT + MTF + RLE + HA": 61.41,
+                "HA": 5.510, "RLE": 96.658, "BWT + RLE": 46.08,
+                "BWT + MTF + HA": 7.71, "BWT + MTF + RLE + HA": 61.41,
                 "LZ77": 25.093, "LZ77 + HA": 48.779, "LZ78": 89.99, "LZ78 + HA": 93.92
             },
             "title": "ч/б изображения",
@@ -83,8 +83,8 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 3.796, "RLE": 60.992, "BWT + RLE": 112.89,
-                "BWT + MTF + HA": 7.97, "BWT + MTF + RLE + HA": 35.20,
+                "HA": 3.796, "RLE": 60.992, "BWT + RLE": 27.27,
+                "BWT + MTF + HA": 7.58, "BWT + MTF + RLE + HA": 35.20,
                 "LZ77": 11.616, "LZ77 + HA": 23.076, "LZ78": 35.00, "LZ78 + HA": 33.94
             },
             "title": "изображения в оттенках серого",
@@ -93,8 +93,8 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 3.169, "RLE": 0.949, "BWT + RLE": 62.95,
-                "BWT + MTF + HA": 7.94, "BWT + MTF + RLE + HA": 31.23,
+                "HA": 3.169, "RLE": 0.949, "BWT + RLE": 31.45,
+                "BWT + MTF + HA": 7.45, "BWT + MTF + RLE + HA": 31.23,
                 "LZ77": 16.244, "LZ77 + HA": 35.316, "LZ78": 58.18, "LZ78 + HA": 59.42
             },
             "title": "цветного изображения",
