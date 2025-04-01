@@ -1,8 +1,10 @@
 import os
 from compressor_lz77 import lz77_encode, lz77_decode
 from compressor_ha import huffman_compress, huffman_decompress
+from file_analysis import analyze_compression
 
-def lz77_huffman_compress(data: bytes, buffer_size: int = 512) -> bytes:
+
+def lz77_huffman_compress(data: bytes, buffer_size: int = 8192) -> bytes:
     """
     Сжимает данные с использованием LZ77 и Хаффмана.
     :param data: Исходные данные (байтовая строка).
@@ -62,91 +64,50 @@ def decompress_file(input_file: str, output_file: str):
         decompressed_data = lz77_huffman_decompress(compressed_data)
         f_out.write(decompressed_data)
 
-def analyze_compression(input_file: str, compressed_file: str, decompressed_file: str):
-    """
-    Анализирует сжатие: размеры файлов и коэффициент сжатия.
-    :param input_file: Путь к исходному файлу.
-    :param compressed_file: Путь к сжатому файлу.
-    :param decompressed_file: Путь к распакованному файлу.
-    """
-    # Размер исходного файла
-    original_size = os.path.getsize(input_file)
-
-    # Размер сжатого файла
-    compressed_size = os.path.getsize(compressed_file)
-
-    # Размер декомпрессированного файла
-    decompressed_size = os.path.getsize(decompressed_file)
-
-    # Коэффициент сжатия
-    compression_ratio = original_size / compressed_size if compressed_size > 0 else 0
-
-    # Вывод результатов
-    print(f"Файл: {input_file}")
-    print(f"Размер исходного файла: {original_size} байт")
-    print(f"Размер сжатого файла: {compressed_size} байт")
-    print(f"Размер декомпрессированного файла: {decompressed_size} байт")
-    print(f"Коэффициент сжатия: {compression_ratio:.3f}")
-    print("-" * 40)
 
 # Пример использования
 if __name__ == "__main__":
-    # Обработка файла enwik7 (английский текст)
+    # Обработка файла enwik7
     input_data = "C:/OPP/compression_project/tests/test1_enwik7"
     compress_data = "C:/OPP/compression_project/results/compressed/test1/c_enwik7_lz77_ha.bin"
     decompress_data = "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_lz77_ha.txt"
 
     compress_file(input_data, compress_data)
-    print("Сжатие enwik7 с использованием LZ77 + Хаффмана завершено.")
-
     decompress_file(compress_data, decompress_data)
-    print("Распаковка enwik7 завершена.")
-
     analyze_compression(input_data, compress_data, decompress_data)
-    print("Анализ сжатия enwik7 завершен.")
-    print("-" * 40)
+    print("Сжатие и распаковка enwik7 завершены.\n")
 
     # Обработка файла test2 (русский текст)
     input_data_ru = "C:/OPP/compression_project/tests/test2_rus.txt"
-    compress_data_ru = "C:/OPP/compression_project/results/compressed/test2/rus_lz77_ha.bin"
-    decompress_data_ru = "C:/OPP/compression_project/results/decompressors/test2/rus_lz77_ha.txt"
+    compress_data_ru = "C:/OPP/compression_project/results/compressed/test2/c_rus_lz77_ha.bin"
+    decompress_data_ru = "C:/OPP/compression_project/results/decompressors/test2/d_rus_lz77_ha.txt"
 
     compress_file(input_data_ru, compress_data_ru)
-    print("Сжатие русского текста с использованием LZ77 + Хаффмана завершено.")
-
     decompress_file(compress_data_ru, decompress_data_ru)
-    print("Распаковка русского текста завершена.")
-
     analyze_compression(input_data_ru, compress_data_ru, decompress_data_ru)
-    print("Анализ сжатия русского текста завершен.")
-    print("-" * 40)
+    print("Сжатие и распаковка русского текста завершены.\n")
 
     # Обработка бинарного файла
     binary_input = "C:/OPP/compression_project/tests/test3_bin.exe"
-    binary_compressed = "C:/OPP/compression_project/results/compressed/test3/binary_file_lz77_ha.bin"
-    binary_decompressed = "C:/OPP/compression_project/results/decompressors/test3/binary_file_lz77_ha_decompressed.bin"
+    binary_compressed = "C:/OPP/compression_project/results/compressed/test3/c_binary_lz77_ha.bin"
+    binary_decompressed = "C:/OPP/compression_project/results/decompressors/test3/d_binary_lz77_ha.exe"
 
     compress_file(binary_input, binary_compressed)
-    print("Сжатие бинарного файла с использованием LZ77 + Хаффмана завершено.")
-
     decompress_file(binary_compressed, binary_decompressed)
-    print("Распаковка бинарного файла завершена.")
-
     analyze_compression(binary_input, binary_compressed, binary_decompressed)
-    print("Анализ сжатия бинарного файла завершен.")
-    print("-" * 40)
+    print("Бинарный файл сжат и распакован.\n")
 
-    # Обработка изображений
+    # Пути к исходным RAW-файлам
     bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
     gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
     color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
 
     # Пути для сохранения сжатых файлов
-    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_lz77_ha.bin"
-    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_lz77_ha.bin"
-    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_lz77_ha.bin"
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_lz77_ha_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_lz77_ha_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_lz77_ha_compressed.bin"
 
-    # Сжатие RAW-файлов с использованием LZ77 + Хаффмана
+    # Сжатие RAW-файлов
     compress_file(bw_raw_path, bw_compressed_path)
     compress_file(gray_raw_path, gray_compressed_path)
     compress_file(color_raw_path, color_compressed_path)
@@ -156,7 +117,7 @@ if __name__ == "__main__":
     gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_lz77_ha_decompressed.raw"
     color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_lz77_ha_decompressed.raw"
 
-    # Декомпрессия RAW-файлов с использованием LZ77 + Хаффмана
+    # Декомпрессия RAW-файлов
     decompress_file(bw_compressed_path, bw_decompressed_raw_path)
     decompress_file(gray_compressed_path, gray_decompressed_raw_path)
     decompress_file(color_compressed_path, color_decompressed_raw_path)

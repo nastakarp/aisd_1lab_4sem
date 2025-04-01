@@ -1,63 +1,73 @@
-#lz77
-def lz77_encode(data: bytes, buffer_size: int) -> bytes:
+def lz77_encode(data: bytes, buffer_size: int = 8192) -> bytes:
     """
-    Кодирование данных с использованием алгоритма LZ77.
-    :param data: Входные данные (байтовая строка).
-    :param buffer_size: Размер буфера.
+    Кодирует данные с использованием алгоритма LZ77.
+    :param data: Исходные данные (байтовая строка).
+    :param buffer_size: Размер буфера для поиска совпадений.
     :return: Сжатые данные (байтовая строка).
     """
-    compressed_data = []
+    encoded_data = bytearray()
     i = 0
-    while i < len(data):
-        # Ищем максимальное совпадение в буфере
-        match_offset, match_length = 0, 0
-        for offset in range(1, min(buffer_size, i) + 1):
-            current_length = 0
-            while (i + current_length < len(data) and
-                   data[i + current_length] == data[i - offset + current_length]):
-                current_length += 1
-            if current_length > match_length:
-                match_offset, match_length = offset, current_length
+    n = len(data)
 
-        # Ограничиваем длину совпадения 255
-        match_length = min(match_length, 255)
+    while i < n:
+        max_length = 0
+        max_offset = 0
 
-        # Получаем следующий символ
-        next_char = data[i + match_length] if i + match_length < len(data) else b''
+        # Определяем границы поиска
+        search_start = max(0, i - buffer_size)
+        search_end = i
 
-        # Добавляем тройку (offset, length, next_char) в сжатые данные
-        compressed_data.append(match_offset)
-        compressed_data.append(match_length)
-        if next_char:
-            compressed_data.append(next_char)
+        # Ищем максимальное совпадение
+        for length in range(min(255, n - i), 0, -1):
+            substring = data[i:i + length]
+            offset = data[search_start:search_end].rfind(substring)
+            if offset != -1:
+                max_length = length
+                max_offset = search_end - search_start - offset
+                break
 
-        # Перемещаем указатель
-        i += match_length + 1
+        if max_length > 0:
+            # Кодируем offset и length в два байта каждый
+            encoded_data.append((max_offset >> 8) & 0xFF)  # Старший байт offset
+            encoded_data.append(max_offset & 0xFF)  # Младший байт offset
+            encoded_data.append((max_length >> 8) & 0xFF)  # Старший байт length
+            encoded_data.append(max_length & 0xFF)  # Младший байт length
+            i += max_length
+        else:
+            # Если совпадений нет, кодируем как символ
+            encoded_data.append(0)  # offset = 0 (старший байт)
+            encoded_data.append(0)  # offset = 0 (младший байт)
+            encoded_data.append(0)  # length = 0 (старший байт)
+            encoded_data.append(0)  # length = 0 (младший байт)
+            encoded_data.append(data[i])  # символ (1 байт)
+            i += 1
 
-    # Преобразуем список в байты
-    return bytes(compressed_data)
+    return bytes(encoded_data)
 
-def lz77_decode(compressed_data: bytes) -> bytes:
+def lz77_decode(encoded_data: bytes) -> bytes:
     """
-    Декодирование данных, сжатых с использованием алгоритма LZ77.
-    :param compressed_data: Сжатые данные (байтовая строка).
+    Декодирует данные, сжатые с использованием алгоритма LZ77.
+    :param encoded_data: Сжатые данные (байтовая строка).
     :return: Восстановленные данные (байтовая строка).
     """
-    decompressed_data = []
+    decoded_data = bytearray()
     i = 0
-    while i < len(compressed_data):
-        # Читаем тройку (offset, length, next_char)
-        match_offset = compressed_data[i]
-        match_length = compressed_data[i + 1]
-        next_char = compressed_data[i + 2] if i + 2 < len(compressed_data) else None
+    n = len(encoded_data)
 
-        # Восстанавливаем данные
-        for _ in range(match_length):
-            decompressed_data.append(decompressed_data[-match_offset])
-        if next_char is not None:
-            decompressed_data.append(next_char)
+    while i < n:
+        # Читаем offset и length (по два байта каждый)
+        offset = (encoded_data[i] << 8) | encoded_data[i + 1]
+        length = (encoded_data[i + 2] << 8) | encoded_data[i + 3]
+        i += 4
 
-        # Перемещаем указатель
-        i += 3 if next_char is not None else 2
+        if offset == 0 and length == 0:
+            # Это символ
+            decoded_data.append(encoded_data[i])
+            i += 1
+        else:
+            # Это ссылка
+            start = len(decoded_data) - offset
+            end = start + length
+            decoded_data.extend(decoded_data[start:end])
 
-    return bytes(decompressed_data)
+    return bytes(decoded_data)

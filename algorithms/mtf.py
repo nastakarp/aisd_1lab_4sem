@@ -1,3 +1,4 @@
+# Функции для MTF
 def mtf_transform(data: bytes) -> bytes:
     alphabet = list(range(256))
     transformed_data = bytearray()

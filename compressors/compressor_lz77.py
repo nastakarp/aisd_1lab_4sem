@@ -1,260 +1,97 @@
 import os
-import math
-from collections import Counter
+from algorithms.lz77 import lz77_encode, lz77_decode
+from file_analysis import analyze_compression
 
-def calculate_compression_ratio(original_size: int, compressed_size: int) -> float:
-    """
-    Рассчитывает коэффициент сжатия.
-    :param original_size: Размер исходного файла в байтах.
-    :param compressed_size: Размер сжатого файла в байтах.
-    :return: Коэффициент сжатия.
-    """
-    return original_size / compressed_size
 
-def calculate_entropy(data: bytes) -> float:
-    """
-    Рассчитывает энтропию файла.
-    :param data: Данные файла в виде байтовой строки.
-    :return: Энтропия файла.
-    """
-    if not data:
-        return 0.0
-
-    # Считаем частоту каждого символа
-    frequency = Counter(data)
-    total_symbols = len(data)
-
-    # Рассчитываем энтропию
-    entropy = 0.0
-    for count in frequency.values():
-        probability = count / total_symbols
-        entropy -= probability * math.log2(probability)
-
-    return entropy
-
-def analyze_file(file_path: str):
-    """
-    Анализирует файл: рассчитывает его размер и энтропию.
-    :param file_path: Путь к файлу.
-    :return: Размер файла и его энтропия.
-    """
-    with open(file_path, "rb") as f:
-        data = f.read()
-    file_size = len(data)
-    entropy = calculate_entropy(data)
-    return file_size, entropy
-
-def lz77_encode(data: bytes, buffer_size: int = 512) -> bytes:
-    """
-    Кодирует данные с использованием алгоритма LZ77.
-    :param data: Исходные данные (байтовая строка).
-    :param buffer_size: Размер буфера для поиска совпадений.
-    :return: Сжатые данные (байтовая строка).
-    """
-    encoded_data = bytearray()
-    i = 0
-    n = len(data)
-
-    while i < n:
-        max_length = 0
-        max_offset = 0
-
-        # Определяем границы поиска
-        search_start = max(0, i - buffer_size)
-        search_end = i
-
-        # Ищем максимальное совпадение
-        for length in range(min(255, n - i), 0, -1):
-            substring = data[i:i + length]
-            offset = data[search_start:search_end].rfind(substring)
-            if offset != -1:
-                max_length = length
-                max_offset = search_end - search_start - offset
-                break
-
-        if max_length > 0:
-            # Кодируем offset и length в два байта каждый
-            encoded_data.append((max_offset >> 8) & 0xFF)  # Старший байт offset
-            encoded_data.append(max_offset & 0xFF)  # Младший байт offset
-            encoded_data.append((max_length >> 8) & 0xFF)  # Старший байт length
-            encoded_data.append(max_length & 0xFF)  # Младший байт length
-            i += max_length
-        else:
-            # Если совпадений нет, кодируем как символ
-            encoded_data.append(0)  # offset = 0 (старший байт)
-            encoded_data.append(0)  # offset = 0 (младший байт)
-            encoded_data.append(0)  # length = 0 (старший байт)
-            encoded_data.append(0)  # length = 0 (младший байт)
-            encoded_data.append(data[i])  # символ (1 байт)
-            i += 1
-
-    return bytes(encoded_data)
-
-def lz77_decode(encoded_data: bytes) -> bytes:
-    """
-    Декодирует данные, сжатые с использованием алгоритма LZ77.
-    :param encoded_data: Сжатые данные (байтовая строка).
-    :return: Восстановленные данные (байтовая строка).
-    """
-    decoded_data = bytearray()
-    i = 0
-    n = len(encoded_data)
-
-    while i < n:
-        # Читаем offset и length (по два байта каждый)
-        offset = (encoded_data[i] << 8) | encoded_data[i + 1]
-        length = (encoded_data[i + 2] << 8) | encoded_data[i + 3]
-        i += 4
-
-        if offset == 0 and length == 0:
-            # Это символ
-            decoded_data.append(encoded_data[i])
-            i += 1
-        else:
-            # Это ссылка
-            start = len(decoded_data) - offset
-            end = start + length
-            decoded_data.extend(decoded_data[start:end])
-
-    return bytes(decoded_data)
-
-def compress_file(input_file: str, output_file: str, buffer_size: int = 512):
+def compress_file(input_file: str, output_file: str, buffer_size: int = 8192):
     """
     Сжимает файл с использованием алгоритма LZ77.
-    :param input_file: Путь к исходному файлу.
-    :param output_file: Путь к файлу для сохранения сжатых данных.
-    :param buffer_size: Размер буфера для LZ77.
-    """
-    # Проверяем, существует ли директория для выходного файла
-    output_dir = os.path.dirname(output_file)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
 
-    with open(input_file, "rb") as f_in, open(output_file, "wb") as f_out:
-        data = f_in.read()  # Читаем весь файл
-        compressed_data = lz77_encode(data, buffer_size)  # Сжимаем целиком
+    :param input_file: Путь к исходному файлу
+    :param output_file: Путь для сохранения сжатого файла
+    :param buffer_size: Размер буфера поиска для LZ77
+    """
+    # Создаем директорию для выходного файла, если она не существует
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+    with open(input_file, 'rb') as f_in:
+        data = f_in.read()
+
+    compressed_data = lz77_encode(data, buffer_size)
+
+    with open(output_file, 'wb') as f_out:
         f_out.write(compressed_data)
+
 
 def decompress_file(input_file: str, output_file: str):
     """
     Распаковывает файл, сжатый алгоритмом LZ77.
-    :param input_file: Путь к сжатому файлу.
-    :param output_file: Путь к файлу для сохранения восстановленных данных.
+
+    :param input_file: Путь к сжатому файлу
+    :param output_file: Путь для сохранения распакованного файла
     """
-    try:
-        # Проверяем, существует ли директория для выходного файла
-        output_dir = os.path.dirname(output_file)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+    # Создаем директорию для выходного файла, если она не существует
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-        with open(input_file, "rb") as f_in, open(output_file, "wb") as f_out:
-            compressed_data = f_in.read()  # Читаем весь сжатый файл
-            decompressed_data = lz77_decode(compressed_data)  # Декодируем
-            f_out.write(decompressed_data)  # Записываем восстановленные данные
-    except Exception as e:
-        print(f"Ошибка при распаковке файла: {e}")
+    with open(input_file, 'rb') as f_in:
+        compressed_data = f_in.read()
 
-def test_buffer_sizes(input_file: str, output_dir: str, buffer_sizes: list):
-    """
-    Тестирует сжатие с разными размерами буфера.
-    :param input_file: Путь к исходному файлу.
-    :param output_dir: Директория для сохранения сжатых файлов.
-    :param buffer_sizes: Список размеров буфера для тестирования.
-    """
-    # Создаем директорию для результатов, если она не существует
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    decompressed_data = lz77_decode(compressed_data)
 
-    # Анализируем исходный файл
-    original_size, original_entropy = analyze_file(input_file)
-    print(f"Исходный файл: {input_file}")
-    print(f"Размер исходного файла: {original_size} байт")
-    print(f"Энтропия исходного файла: {original_entropy:.2f} бит/символ")
-    print("-" * 40)
+    with open(output_file, 'wb') as f_out:
+        f_out.write(decompressed_data)
+def main():
+    # Обработка файла enwik7
+    input_data = "C:/OPP/compression_project/tests/test1_enwik7"
+    compress_data = "C:/OPP/compression_project/results/compressed/test1/c_enwik7_lz77.bin"
+    decompress_data = "C:/OPP/compression_project/results/decompressors/test1/d_enwik7_lz77.txt"
 
-    # Тестируем для каждого размера буфера
-    results = []
-    for buffer_size in buffer_sizes:
-        print(f"Тестирование с buffer_size = {buffer_size}...")
-
-        # Генерируем пути для сжатого и распакованного файлов
-        compressed_file = os.path.join(output_dir, f"compressed_{buffer_size}.bin")
-        decompressed_file = os.path.join(output_dir, f"decompressed_{buffer_size}.bin")
-
-        # Сжимаем файл
-        compress_file(input_file, compressed_file, buffer_size=buffer_size)
-
-        # Распаковываем файл
-        decompress_file(compressed_file, decompressed_file)
-
-        # Анализируем сжатие
-        compressed_size, _ = analyze_file(compressed_file)
-        compression_ratio = calculate_compression_ratio(original_size, compressed_size)
-
-        # Проверяем, что распакованный файл совпадает с исходным
-        with open(input_file, "rb") as f1, open(decompressed_file, "rb") as f2:
-            assert f1.read() == f2.read(), "Ошибка: распакованные данные не совпадают с исходными"
-
-        # Сохраняем результаты
-        results.append((buffer_size, compressed_size, compression_ratio))
-
-        # Выводим результаты
-        print(f"Размер сжатого файла: {compressed_size} байт")
-        print(f"Коэффициент сжатия: {compression_ratio:.3f}")
-        print("-" * 40)
-
-    # Выводим итоговую таблицу
-    print("\nИтоговые результаты:")
-    print("Buffer Size | Compressed Size | Compression Ratio")
-    print("-" * 40)
-    for buffer_size, compressed_size, compression_ratio in results:
-        print(f"{buffer_size:11} | {compressed_size:15} | {compression_ratio:.3f}")
-
-if __name__ == "__main__":
-    # Параметры тестирования
-    buffer_sizes = 16384 # Размеры буфера для тестирования
-    '''
-    # Обработка файла enwik7 (английский текст)
-    input_enwik7 = "C:/OPP/compression_project/tests/test1_enwik7"
-    output_enwik7 = "C:/OPP/compression_project/results/buffer_size_test/enwik7"
-    print("Тестирование файла enwik7 (английский текст):")
-    test_buffer_sizes(input_enwik7, output_enwik7, buffer_sizes)
-    print("=" * 60)
+    compress_file(input_data, compress_data)
+    decompress_file(compress_data, decompress_data)
+    analyze_compression(input_data, compress_data, decompress_data)
+    print("Сжатие и распаковка enwik7 завершены.\n")
 
     # Обработка файла test2 (русский текст)
-    input_rus = "C:/OPP/compression_project/tests/test2_rus.txt"
-    output_rus = "C:/OPP/compression_project/results/buffer_size_test/rus"
-    print("Тестирование файла test2 (русский текст):")
-    test_buffer_sizes(input_rus, output_rus, buffer_sizes)
-    print("=" * 60)
-    '''
-    # Обработка бинарного файла
-    input_bin = "C:/OPP/compression_project/tests/test3_bin.exe"
-    output_bin = "C:/OPP/compression_project/results/buffer_size_test/bin"
-    print("Тестирование бинарного файла:")
-    test_buffer_sizes(input_bin, output_bin, buffer_sizes)
-    print("=" * 60)
+    input_data_ru = "C:/OPP/compression_project/tests/test2_rus.txt"
+    compress_data_ru = "C:/OPP/compression_project/results/compressed/test2/c_rus_lz77.bin"
+    decompress_data_ru = "C:/OPP/compression_project/results/decompressors/test2/d_rus_lz77.txt"
 
-    '''    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
+    compress_file(input_data_ru, compress_data_ru)
+    decompress_file(compress_data_ru, decompress_data_ru)
+    analyze_compression(input_data_ru, compress_data_ru, decompress_data_ru)
+    print("Сжатие и распаковка русского текста завершены.\n")
+
+    # Обработка бинарного файла
+    binary_input = "C:/OPP/compression_project/tests/test3_bin.exe"
+    binary_compressed = "C:/OPP/compression_project/results/compressed/test3/c_binary_lz77.bin"
+    binary_decompressed = "C:/OPP/compression_project/results/decompressors/test3/d_binary_lz77.exe"
+
+    compress_file(binary_input, binary_compressed)
+    decompress_file(binary_compressed, binary_decompressed)
+    analyze_compression(binary_input, binary_compressed, binary_decompressed)
+    print("Бинарный файл сжат и распакован.\n")
+
+    # Пути к исходным RAW-файлам
+    bw_raw_path = "C:/OPP/compression_project/tests/black_white_image.raw"
     gray_raw_path = "C:/OPP/compression_project/tests/gray_image.raw"
     color_raw_path = "C:/OPP/compression_project/tests/color_image.raw"
 
     # Пути для сохранения сжатых файлов
-    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_compressed.bin"
-    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_compressed.bin"
-    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_compressed.bin"
+    bw_compressed_path = "C:/OPP/compression_project/results/compressed/test4/bw_image_lz77_compressed.bin"
+    gray_compressed_path = "C:/OPP/compression_project/results/compressed/test5/gray_image_lz77_compressed.bin"
+    color_compressed_path = "C:/OPP/compression_project/results/compressed/test6/color_image_lz77_compressed.bin"
 
-    # Сжатие RAW-файлов с использованием LZ77
+    # Сжатие RAW-файлов
     compress_file(bw_raw_path, bw_compressed_path)
     compress_file(gray_raw_path, gray_compressed_path)
     compress_file(color_raw_path, color_compressed_path)
 
     # Пути для восстановленных RAW-файлов
-    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_decompressed.raw"
-    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_decompressed.raw"
-    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_decompressed.raw"
+    bw_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test4/bw_image_lz77_decompressed.raw"
+    gray_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test5/gray_image_lz77_decompressed.raw"
+    color_decompressed_raw_path = "C:/OPP/compression_project/results/decompressors/test6/color_image_lz77_decompressed.raw"
 
-    # Декомпрессия RAW-файлов с использованием LZ77
+    # Декомпрессия RAW-файлов
     decompress_file(bw_compressed_path, bw_decompressed_raw_path)
     decompress_file(gray_compressed_path, gray_decompressed_raw_path)
     decompress_file(color_compressed_path, color_decompressed_raw_path)
@@ -268,6 +105,5 @@ if __name__ == "__main__":
 
     print("Цветное изображение:")
     analyze_compression(color_raw_path, color_compressed_path, color_decompressed_raw_path)
-  '''
 
-    print("Все тесты завершены.")
+main()

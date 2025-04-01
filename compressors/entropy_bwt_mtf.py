@@ -1,3 +1,7 @@
+from algorithms.bwt import  bwt_transform
+from algorithms.mtf import  mtf_transform
+from file_analysis import calculate_entropy
+
 import numpy as np
 from collections import defaultdict
 import matplotlib
@@ -5,62 +9,6 @@ import matplotlib.pyplot as plt
 
 # Устанавливаем бэкенд, который работает в PyCharm
 matplotlib.use('TkAgg')  # Или 'Qt5Agg' если у вас установлен PyQt5
-
-
-def build_suffix_array(data: bytes) -> list[int]:
-    n = len(data)
-    sa = list(range(n))
-    rank = [0] * n
-    for i in range(n):
-        rank[i] = data[i]
-    k = 1
-    while k < n:
-        sa.sort(key=lambda i: (rank[i], rank[i + k] if i + k < n else -1))
-        new_rank = [0] * n
-        new_rank[sa[0]] = 0
-        for i in range(1, n):
-            prev = sa[i - 1]
-            curr = sa[i]
-            equal = (rank[prev] == rank[curr] and
-                     (prev + k < n and curr + k < n and
-                      rank[prev + k] == rank[curr + k]))
-            new_rank[curr] = new_rank[prev] + (0 if equal else 1)
-        rank = new_rank
-        k *= 2
-    return sa
-
-
-def bwt_transform(data: bytes) -> tuple[bytes, int]:
-    n = len(data)
-    suffix_array = build_suffix_array(data)
-    transformed_data = bytearray()
-    for i in range(n):
-        transformed_data.append(data[(suffix_array[i] + n - 1) % n])
-    index = suffix_array.index(0)
-    return bytes(transformed_data), index
-
-
-def mtf_transform(data: bytes) -> bytes:
-    alphabet = list(range(256))
-    transformed_data = bytearray()
-    for byte in data:
-        index = alphabet.index(byte)
-        transformed_data.append(index)
-        alphabet.pop(index)
-        alphabet.insert(0, byte)
-    return bytes(transformed_data)
-
-
-def calculate_entropy(data: bytes) -> float:
-    counts = defaultdict(int)
-    for byte in data:
-        counts[byte] += 1
-    entropy = 0.0
-    total = len(data)
-    for count in counts.values():
-        p = count / total
-        entropy -= p * np.log2(p)
-    return entropy
 
 
 def process_file(filename: str, block_sizes: list[int]) -> dict[int, float]:
