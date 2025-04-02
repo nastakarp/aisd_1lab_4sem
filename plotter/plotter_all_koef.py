@@ -43,9 +43,9 @@ def plot_all():
     plots = [
         {
             "data": {
-                "HA": 1.559, "RLE": 0.924, "BWT + RLE": 0.80,
-                "BWT + MTF + HA": 1.90, "BWT + MTF + RLE + HA": 1.67,
-                "LZ77": 1.256, "LZ77 + HA": 1.273, "LZ78": 1.85, "LZ78 + HA": 2.02
+                "HA": 1.559, "RLE": 0.924, "BWT + RLE": 0.978,
+                "BWT + MTF + HA": 1.897, "BWT + MTF + RLE + HA": 1.452,
+                "LZ77": 1.109, "LZ77 + HA": 1.109, "LZ78": 1.849, "LZ78 + HA": 2.019
             },
             "title": "enwik7",
             "filename": "enwik7_compression.png",
@@ -53,9 +53,9 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 1.958, "RLE": 0.962, "BWT + RLE": 1.10,
-                "BWT + MTF + HA": 2.42, "BWT + MTF + RLE + HA": 2.59,
-                "LZ77": 1.627, "LZ77 + HA": 1.498, "LZ78": 2.25, "LZ78 + HA": 2.38
+                "HA": 1.958, "RLE": 0.962, "BWT + RLE": 1.510,
+                "BWT + MTF + HA": 2.419, "BWT + MTF + RLE + HA": 2.160,
+                "LZ77": 1.462, "LZ77 + HA": 1.462, "LZ78": 2.249, "LZ78 + HA": 2.384
             },
             "title": "русского текста",
             "filename": "russian_text_compression.png",
@@ -63,9 +63,9 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 1.243, "RLE": 0.988, "BWT + RLE": 0.85,
-                "BWT + MTF + HA": 1.62, "BWT + MTF + RLE + HA": 1.53,
-                "LZ77": 0.905, "LZ77 + HA": 1.123, "LZ78": 1.30, "LZ78 + HA": 1.47
+                "HA": 1.243, "RLE": 0.988, "BWT + RLE": 1.093,
+                "BWT + MTF + HA": 1.621, "BWT + MTF + RLE + HA": 1.379,
+                "LZ77": 0.829, "LZ77 + HA": 0.829, "LZ78": 1.297, "LZ78 + HA": 1.471
             },
             "title": "бинарного файла",
             "filename": "binary_file_compression.png",
@@ -73,9 +73,9 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 5.510, "RLE": 96.658, "BWT + RLE": 46.08,
-                "BWT + MTF + HA": 7.71, "BWT + MTF + RLE + HA": 61.41,
-                "LZ77": 25.093, "LZ77 + HA": 48.779, "LZ78": 89.99, "LZ78 + HA": 93.92
+                "HA": 5.510, "RLE": 96.658, "BWT + RLE": 43.329,
+                "BWT + MTF + HA": 7.705, "BWT + MTF + RLE + HA": 62.142,
+                "LZ77": 63.339, "LZ77 + HA": 63.339, "LZ78": 89.989, "LZ78 + HA": 93.916
             },
             "title": "ч/б изображения",
             "filename": "bw_image_compression.png",
@@ -83,9 +83,9 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 3.796, "RLE": 60.992, "BWT + RLE": 27.27,
-                "BWT + MTF + HA": 7.58, "BWT + MTF + RLE + HA": 35.20,
-                "LZ77": 11.616, "LZ77 + HA": 23.076, "LZ78": 35.00, "LZ78 + HA": 33.94
+                "HA": 3.796, "RLE": 60.992, "BWT + RLE": 24.417,
+                "BWT + MTF + HA": 7.580, "BWT + MTF + RLE + HA": 30.302,
+                "LZ77": 60.861, "LZ77 + HA": 60.861, "LZ78": 35.004, "LZ78 + HA": 33.940
             },
             "title": "изображения в оттенках серого",
             "filename": "grayscale_image_compression.png",
@@ -93,9 +93,9 @@ def plot_all():
         },
         {
             "data": {
-                "HA": 3.169, "RLE": 0.949, "BWT + RLE": 31.45,
-                "BWT + MTF + HA": 7.45, "BWT + MTF + RLE + HA": 31.23,
-                "LZ77": 16.244, "LZ77 + HA": 35.316, "LZ78": 58.18, "LZ78 + HA": 59.42
+                "HA": 3.169, "RLE": 0.949, "BWT + RLE": 29.208,
+                "BWT + MTF + HA": 7.447, "BWT + MTF + RLE + HA": 35.776,
+                "LZ77": 58.790, "LZ77 + HA": 58.790, "LZ78": 58.175, "LZ78 + HA": 59.416
             },
             "title": "цветного изображения",
             "filename": "color_image_compression.png",
